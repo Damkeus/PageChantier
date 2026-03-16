@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Glassmorphism Utilities if needed, though Tailwind controls usually suffice */
+.glass-panel {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+}
+
+/* Very small text for mobile */
+.text-xxs {
+    font-size: 0.625rem; /* 10px */
+    line-height: 0.875rem; /* 14px */
+}
+
+/* Background Gradients & Effects */
+.bg-nexans-gradient {
+    background: linear-gradient(135deg, #b91c1c 0%, #ea580c 100%);
+}
