@@ -7,6 +7,7 @@ export class MenuChantier implements ComponentFramework.StandardControl<IInputs,
     private _container: HTMLDivElement | null = null;
     private _notifyOutputChanged!: () => void;
     private _props: { projectJSON?: string; jsonSchema?: string } = {};
+    private _outputs: IOutputs = {};
 
 
 
@@ -43,7 +44,12 @@ export class MenuChantier implements ComponentFramework.StandardControl<IInputs,
         const projectJSON = context.parameters.ProjectJSON.raw ?? undefined;
         const jsonSchema = context.parameters.JSONSchema.raw ?? undefined;
 
-        const props = { projectJSON, jsonSchema };
+        const onOutputChange = (key: string, value: string | boolean): void => {
+            (this._outputs as Record<string, string | boolean>)[key] = value;
+            this._notifyOutputChanged();
+        };
+
+        const props = { projectJSON, jsonSchema, onOutputChange };
 
         ReactDOM.render(
             React.createElement(App, props),
@@ -56,7 +62,7 @@ export class MenuChantier implements ComponentFramework.StandardControl<IInputs,
      * @returns an object based on nomenclature defined in manifest, expecting object[s] for property marked as “bound” or “output”
      */
     public getOutputs(): IOutputs {
-        return {};
+        return this._outputs;
     }
 
     /**

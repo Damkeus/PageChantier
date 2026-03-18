@@ -11,6 +11,7 @@ export interface SchemaElement {
     type: string;
     label: string;
     assetImg: string;
+    mirrored?: boolean;
 }
 
 export interface SchemaData {
@@ -55,12 +56,14 @@ const parseOrdreSchema = (ordreSchemaString: string): SchemaElement[] => {
 
         const mapping = ID_TO_TYPE_MAP[numericId];
         const labelPrefix = numericId <= 3 ? 'E' : 'J';
+        const isFirst = elements.filter(e => e.type !== 'empty').length === 0;
 
         elements.push({
             id: numericId * 100 + index,
             type: mapping.name,
             label: `${labelPrefix}${index + 1}`,
-            assetImg: mapping.asset
+            assetImg: mapping.asset,
+            mirrored: isFirst,
         });
     });
 
@@ -77,6 +80,7 @@ interface SchemaViewProps {
     onElementClick: (element: SchemaElement) => void;
     selectedElement: SchemaElement | null;
     onCloseModal: () => void;
+    onPhotoTrigger?: () => void;
 }
 
 export const SchemaView: React.FC<SchemaViewProps> = ({
@@ -84,7 +88,8 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
     onBack,
     onElementClick,
     selectedElement,
-    onCloseModal
+    onCloseModal,
+    onPhotoTrigger,
 }) => {
     const elements = schemaData?.ordreSchema?.trim()
         ? parseOrdreSchema(schemaData.ordreSchema)
@@ -94,7 +99,7 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
         <div style={{ fontFamily: "'Inter', sans-serif" }} className="w-full h-full flex flex-col bg-slate-50 overflow-hidden">
 
             {/* Top accent */}
-            <div className="h-1 w-full bg-gradient-to-r from-red-700 to-orange-500 flex-shrink-0" />
+            <div className="h-1 w-full bg-gradient-to-r from-nexans to-nexans-light flex-shrink-0" />
 
             {/* Content */}
             <div className="flex flex-col flex-1 p-2 gap-2 overflow-hidden">
@@ -103,7 +108,7 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
                 <header className="flex items-center gap-2 bg-white rounded-xl shadow-sm px-3 py-2 flex-shrink-0">
                     <button
                         onClick={onBack}
-                        className="flex items-center gap-1.5 bg-red-700 hover:bg-red-800 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 flex-shrink-0"
+                        className="flex items-center gap-1.5 bg-nexans hover:bg-nexans-dark text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 flex-shrink-0"
                     >
                         <ArrowLeft className="w-3.5 h-3.5" />
                         <span>Retour</span>
@@ -141,16 +146,17 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
                                             className="flex-shrink-0 bg-white rounded-xl shadow-sm p-2.5 transition-all hover:shadow-md active:scale-95 group w-32"
                                         >
                                             {/* Image */}
-                                            <div className="w-full aspect-square rounded-lg overflow-hidden bg-gray-50 mb-2 group-hover:bg-orange-50 transition-colors">
+                                            <div className="w-full aspect-square rounded-lg overflow-hidden bg-gray-50 mb-2 group-hover:bg-nexans-light/10 transition-colors">
                                                 <img
                                                     src={element.assetImg}
                                                     alt={element.label}
                                                     className="w-full h-full object-contain p-2"
+                                                    style={element.mirrored ? { transform: 'scaleX(-1)' } : undefined}
                                                 />
                                             </div>
                                             {/* Info */}
                                             <div className="text-center">
-                                                <p className="text-sm font-bold text-gray-800 group-hover:text-orange-600 transition-colors">
+                                                <p className="text-sm font-bold text-gray-800 group-hover:text-nexans transition-colors">
                                                     {element.label}
                                                 </p>
                                                 <p className="text-[9px] text-gray-400 mt-0.5 truncate">
@@ -173,7 +179,7 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
 
             {/* Element modal */}
             {selectedElement && selectedElement.type !== 'empty' && (
-                <SchemaElementModal element={selectedElement} onClose={onCloseModal} />
+                <SchemaElementModal element={selectedElement} onClose={onCloseModal} onPhotoTrigger={onPhotoTrigger} />
             )}
         </div>
     );
@@ -186,21 +192,26 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
 interface SchemaElementModalProps {
     element: SchemaElement;
     onClose: () => void;
+    onPhotoTrigger?: () => void;
 }
 
-export const SchemaElementModal: React.FC<SchemaElementModalProps> = ({ element, onClose }) => {
+export const SchemaElementModal: React.FC<SchemaElementModalProps> = ({ element, onClose, onPhotoTrigger }) => {
     const handleAction = (action: string) => {
+        if (action === 'Photo' && onPhotoTrigger) {
+            onPhotoTrigger();
+            return;
+        }
         console.log(`Action: ${action} for element:`, element);
     };
 
     return (
         <div
             style={{ fontFamily: "'Inter', sans-serif" }}
-            className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
             onClick={onClose}
         >
             <div
-                className="w-full max-w-md bg-white rounded-t-2xl shadow-2xl overflow-hidden"
+                className="w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Drag handle */}
@@ -228,6 +239,7 @@ export const SchemaElementModal: React.FC<SchemaElementModalProps> = ({ element,
                             src={element.assetImg}
                             alt={element.label}
                             className="h-full object-contain p-4"
+                            style={element.mirrored ? { transform: 'scaleX(-1)' } : undefined}
                         />
                     </div>
 
@@ -241,9 +253,9 @@ export const SchemaElementModal: React.FC<SchemaElementModalProps> = ({ element,
                             <button
                                 key={label}
                                 onClick={() => handleAction(label)}
-                                className="flex flex-col items-center gap-2 bg-gray-50 hover:bg-orange-50 rounded-xl p-3 transition-all active:scale-95 group"
+                                className="flex flex-col items-center gap-2 bg-gray-50 hover:bg-nexans-light/10 rounded-xl p-3 transition-all active:scale-95 group"
                             >
-                                <Icon className="w-5 h-5 text-red-600 group-hover:scale-110 transition-transform" />
+                                <Icon className="w-5 h-5 text-nexans group-hover:scale-110 transition-transform" />
                                 <span className="text-xs font-semibold text-gray-700">{label}</span>
                             </button>
                         ))}
