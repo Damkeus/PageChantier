@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, X, FileCheck, Image as ImageIcon, ClipboardEdit } from './Icons';
+import { ArrowLeft, X, FileCheck, Camera, ClipboardEdit } from './Icons';
 import * as assets from './assets/assets';
 
 // =============================================
@@ -247,7 +247,7 @@ export const SchemaElementModal: React.FC<SchemaElementModalProps> = ({ element,
                     <div className="grid grid-cols-3 gap-2">
                         {[
                             { label: 'Notice', Icon: FileCheck },
-                            { label: 'Photo', Icon: ImageIcon },
+                            { label: 'Photo', Icon: Camera },
                             { label: 'Livrable', Icon: ClipboardEdit },
                         ].map(({ label, Icon }) => (
                             <button

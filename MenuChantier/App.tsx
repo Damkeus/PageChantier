@@ -171,7 +171,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
             <div className="flex flex-col flex-1 p-2 gap-2 overflow-hidden">
 
                 {/* ── HEADER ── */}
-                <header className="flex flex-col bg-white rounded-2xl shadow-sm px-4 py-4 gap-2 flex-[3.6] min-h-0 justify-center">
+                <header className="flex flex-col bg-white rounded-2xl shadow-sm px-4 py-4 gap-2 flex-[20] min-h-0 justify-center">
                     {/* Top row: label + title */}
                     <div className="flex items-center gap-2 min-w-0">
                         <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 flex-shrink-0 whitespace-nowrap">
@@ -227,7 +227,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                     /* Full featured card when schema exists */
                     <button
                         onClick={() => setCurrentView('schema')}
-                        className="w-full flex flex-row items-center gap-4 bg-white rounded-2xl shadow-sm px-4 py-4 hover:shadow-md transition-all active:scale-[0.99] group overflow-hidden flex-[1.65] min-h-0"
+                        className="w-full flex flex-row items-center gap-4 bg-white rounded-2xl shadow-sm px-4 py-4 hover:shadow-md transition-all active:scale-[0.99] group overflow-hidden flex-[35] min-h-0"
                     >
                         <div className="w-1 self-stretch rounded-full bg-gradient-to-b from-nexans to-nexans-light flex-shrink-0" />
                         <div className="p-3 rounded-xl bg-nexans-light/10 flex-shrink-0 group-hover:bg-nexans-light/20 transition-colors">
@@ -249,7 +249,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                     <button
                         onClick={() => setCurrentView('schema')}
                         style={{ maxHeight: '35%' }}
-                        className="w-full flex flex-row items-center gap-3 bg-white/70 border border-dashed border-gray-200 rounded-xl px-3 py-2.5 hover:bg-white hover:border-nexans/30 hover:shadow-sm transition-all active:scale-[0.99] group overflow-hidden flex-[1.65] min-h-0"
+                        className="w-full flex flex-row items-center gap-3 bg-white/70 border border-dashed border-gray-200 rounded-xl px-3 py-2.5 hover:bg-white hover:border-nexans/30 hover:shadow-sm transition-all active:scale-[0.99] group overflow-hidden flex-[35] min-h-0"
                     >
                         <div className="p-2 rounded-lg bg-gray-100 group-hover:bg-nexans-light/10 flex-shrink-0 transition-colors">
                             <Activity className="w-4 h-4 text-gray-400 group-hover:text-nexans transition-colors" />
@@ -265,7 +265,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                 )}
 
                 {/* ── ACTION CARDS ── */}
-                <div className="grid grid-cols-3 gap-2 flex-[0.48] min-h-0">
+                <div className="grid grid-cols-3 gap-2 flex-[25] min-h-0">
                     <ActionCard
                         icon={<FileText className="w-5 h-5 text-nexans" />}
                         title="Documents"

@@ -947,11 +947,11 @@ video {
 
 .bg-nexans-dark {
   --tw-bg-opacity: 1;
-  background-color: rgb(208 21 16 / var(--tw-bg-opacity, 1));
+  background-color: rgb(224 21 14 / var(--tw-bg-opacity, 1));
 }
 
 .bg-nexans-light\/10 {
-  background-color: rgb(255 77 58 / 0.1);
+  background-color: rgb(255 25 16 / 0.1);
 }
 
 .bg-nexans\/10 {
@@ -987,7 +987,7 @@ video {
 }
 
 .to-nexans-light {
-  --tw-gradient-to: #FF4D3A var(--tw-gradient-to-position);
+  --tw-gradient-to: #FF1910 var(--tw-gradient-to-position);
 }
 
 .object-contain {
@@ -1266,7 +1266,7 @@ video {
 /* Background Gradients & Effects */
 
 .bg-nexans-gradient {
-  background: linear-gradient(135deg, #FF1910 0%, #FF4D3A 100%);
+  background: linear-gradient(135deg, #FF1910 0%, #E0150E 100%);
 }
 
 /* Mic recording pulse animation */
@@ -1310,11 +1310,11 @@ video {
 
 .hover\:bg-nexans-dark:hover {
   --tw-bg-opacity: 1;
-  background-color: rgb(208 21 16 / var(--tw-bg-opacity, 1));
+  background-color: rgb(224 21 14 / var(--tw-bg-opacity, 1));
 }
 
 .hover\:bg-nexans-light\/10:hover {
-  background-color: rgb(255 77 58 / 0.1);
+  background-color: rgb(255 25 16 / 0.1);
 }
 
 .hover\:bg-nexans\/20:hover {
@@ -1391,11 +1391,11 @@ video {
 }
 
 .group:hover .group-hover\:bg-nexans-light\/10 {
-  background-color: rgb(255 77 58 / 0.1);
+  background-color: rgb(255 25 16 / 0.1);
 }
 
 .group:hover .group-hover\:bg-nexans-light\/20 {
-  background-color: rgb(255 77 58 / 0.2);
+  background-color: rgb(255 25 16 / 0.2);
 }
 
 .group:hover .group-hover\:bg-nexans\/20 {

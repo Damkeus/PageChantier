@@ -12,8 +12,8 @@ module.exports = {
             colors: {
                 nexans: {
                     DEFAULT: '#FF1910',
-                    dark: '#D01510',
-                    light: '#FF4D3A',
+                    dark: '#E0150E',
+                    light: '#FF1910',
                 },
             },
         },
