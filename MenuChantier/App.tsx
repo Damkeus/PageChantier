@@ -1,5 +1,4 @@
-import React, { useMemo, useState, useRef } from 'react';
-// useRef kept for SpeechRecognition in RapportPanel
+import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { MapPin, FileText, Activity, ClipboardEdit, Navigation, Camera, Phone, X, User, Mic } from './Icons';
 import { SchemaView } from './SchemaComponents';
 import type { SchemaElement, SchemaData } from './SchemaComponents';
@@ -21,6 +20,8 @@ interface ProjectData {
     PM: string;
     ProjectUniqID?: string;
     ProjectPath?: string;
+    folderpath?: string;
+    FolderPath?: string;
     MonteurMail?: string;
     Contact?: ContactData[] | string | null;
     SchemaFolderPath?: string;
@@ -141,151 +142,158 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
         );
     }
 
-    if (currentView === 'schema') {
-        return (
-            <SchemaView
-                schemaData={schemaData}
-                onBack={() => setCurrentView('menu')}
-                onElementClick={(element) => setSelectedElement(element)}
-                selectedElement={selectedElement}
-                onCloseModal={() => setSelectedElement(null)}
-                onPhotoTrigger={handlePhotoTrigger}
-            />
-        );
-    }
-
     const isMobile = breakpoint === 'mobile';
     const hasSchema = !!schemaData?.ordreSchema?.trim();
 
     return (
-        <div
-            ref={(el: HTMLDivElement | null) => setContainerRef(el)}
-            style={{ fontFamily: "'Inter', sans-serif" }}
-            className={`w-full h-full overflow-hidden bg-slate-50 flex flex-col ${isMobile ? 'pb-[100px]' : ''}`}
-        >
+        <>
+            {currentView === 'schema' ? (
+                <SchemaView
+                    schemaData={schemaData}
+                    onBack={() => setCurrentView('menu')}
+                    onElementClick={(element) => setSelectedElement(element)}
+                    selectedElement={selectedElement}
+                    onCloseModal={() => setSelectedElement(null)}
+                    onPhotoTrigger={handlePhotoTrigger}
+                />
+            ) : (
+                <div
+                    ref={(el: HTMLDivElement | null) => setContainerRef(el)}
+                    style={{ fontFamily: "'Inter', sans-serif" }}
+                    className={`w-full h-full overflow-hidden bg-slate-50 flex flex-col ${isMobile ? 'pb-[100px]' : ''}`}
+                >
 
-            {/* ── Subtle top accent bar ── */}
-            <div className="h-1 w-full bg-gradient-to-r from-nexans to-nexans-light flex-shrink-0" />
+                    {/* ── Subtle top accent bar ── */}
+                    <div className="h-1 w-full bg-gradient-to-r from-nexans to-nexans-light flex-shrink-0" />
 
-            {/* ── Main content ── */}
-            <div className="flex flex-col flex-1 p-2 gap-2 overflow-hidden">
+                    {/* ── Main content ── */}
+                    <div className="flex flex-col flex-1 p-2 gap-2 overflow-hidden">
 
-                {/* ── HEADER ── */}
-                <header className="flex flex-col bg-white rounded-2xl shadow-sm px-4 py-4 gap-2 flex-[20] min-h-0 justify-center">
-                    {/* Top row: label + title */}
-                    <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 flex-shrink-0 whitespace-nowrap">
-                            Chantier en cours
-                        </span>
-                        <span className="text-gray-300 flex-shrink-0">·</span>
-                        <h1 className="text-base font-bold text-nexans truncate leading-tight">
-                            {project.Title}
-                        </h1>
-                    </div>
+                        {/* ── HEADER ── */}
+                        <header className="flex flex-col bg-white rounded-2xl shadow-sm px-4 py-4 gap-2 flex-[20] min-h-0 justify-center">
+                            {/* Top row: label + title */}
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 flex-shrink-0 whitespace-nowrap">
+                                    Chantier en cours
+                                </span>
+                                <span className="text-gray-300 flex-shrink-0">·</span>
+                                <h1 className="text-base font-bold text-nexans truncate leading-tight">
+                                    {project.Title}
+                                </h1>
+                            </div>
 
-                    {/* Info row: PM + Address */}
-                    {(project.PM || project.AddressChantier) && (
-                        <div className="flex flex-col gap-1 text-xs text-gray-500">
-                            {project.PM && (
-                                <div className="flex items-center gap-1.5">
-                                    <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                    <span className="truncate">{project.PM}</span>
+                            {/* Info row: PM + Address */}
+                            {(project.PM || project.AddressChantier) && (
+                                <div className="flex flex-col gap-1 text-xs text-gray-500">
+                                    {project.PM && (
+                                        <div className="flex items-center gap-1.5">
+                                            <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                            <span className="truncate">{project.PM}</span>
+                                        </div>
+                                    )}
+                                    {project.AddressChantier && (
+                                        <div className="flex items-center gap-1.5">
+                                            <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                                            <span className="truncate">{project.AddressChantier}</span>
+                                        </div>
+                                    )}
                                 </div>
                             )}
-                            {project.AddressChantier && (
-                                <div className="flex items-center gap-1.5">
-                                    <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                    <span className="truncate">{project.AddressChantier}</span>
+
+                            {/* Buttons row */}
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setIsContactModalOpen(true)}
+                                    title="Contacts chantier"
+                                    className="flex items-center gap-1.5 bg-nexans hover:bg-nexans-dark text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 shadow-sm"
+                                >
+                                    <Phone className="w-3.5 h-3.5" />
+                                    <span>Contacts</span>
+                                </button>
+                                <button
+                                    onClick={handleOpenGPS}
+                                    title="Itinéraire GPS"
+                                    className="flex items-center gap-1.5 bg-nexans-dark hover:bg-nexans text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 shadow-sm"
+                                >
+                                    <Navigation className="w-3.5 h-3.5" />
+                                    <span>Itinéraire</span>
+                                </button>
+                            </div>
+                        </header>
+
+                        {/* ── SCHÉMA UNIFILAIRE ── */}
+                        {hasSchema ? (
+                            /* Full featured card when schema exists */
+                            <button
+                                onClick={() => setCurrentView('schema')}
+                                className="w-full flex flex-row items-center gap-4 bg-white rounded-2xl shadow-sm px-4 py-4 hover:shadow-md transition-all active:scale-[0.99] group overflow-hidden flex-[35] min-h-0"
+                            >
+                                <div className="w-1 self-stretch rounded-full bg-gradient-to-b from-nexans to-nexans-light flex-shrink-0" />
+                                <div className="p-3 rounded-xl bg-nexans-light/10 flex-shrink-0 group-hover:bg-nexans-light/20 transition-colors">
+                                    <Activity className="w-7 h-7 text-nexans" />
                                 </div>
-                            )}
-                        </div>
-                    )}
+                                <div className="flex flex-col items-start text-left flex-1">
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Vue principale</span>
+                                    <h2 className="text-sm font-bold text-gray-900 group-hover:text-nexans transition-colors leading-tight">
+                                        Schéma Unifilaire
+                                    </h2>
+                                    <p className="text-xs text-gray-500 mt-0.5">Visualiser le schéma du Chantier</p>
+                                </div>
+                                <svg className="w-5 h-5 text-gray-300 group-hover:text-nexans transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        ) : (
+                            /* Compact card when no schema — capped at 35% height */
+                            <button
+                                onClick={() => setCurrentView('schema')}
+                                style={{ maxHeight: '35%' }}
+                                className="w-full flex flex-row items-center gap-3 bg-white/70 border border-dashed border-gray-200 rounded-xl px-3 py-2.5 hover:bg-white hover:border-nexans/30 hover:shadow-sm transition-all active:scale-[0.99] group overflow-hidden flex-[35] min-h-0"
+                            >
+                                <div className="p-2 rounded-lg bg-gray-100 group-hover:bg-nexans-light/10 flex-shrink-0 transition-colors">
+                                    <Activity className="w-4 h-4 text-gray-400 group-hover:text-nexans transition-colors" />
+                                </div>
+                                <div className="flex flex-col items-start text-left flex-1 min-w-0">
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Schéma Unifilaire</span>
+                                    <p className="text-[10px] text-gray-400 italic truncate">Aucun schéma disponible</p>
+                                </div>
+                                <svg className="w-4 h-4 text-gray-300 group-hover:text-nexans transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        )}
 
-                    {/* Buttons row */}
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setIsContactModalOpen(true)}
-                            title="Contacts chantier"
-                            className="flex items-center gap-1.5 bg-nexans hover:bg-nexans-dark text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 shadow-sm"
-                        >
-                            <Phone className="w-3.5 h-3.5" />
-                            <span>Contacts</span>
-                        </button>
-                        <button
-                            onClick={handleOpenGPS}
-                            title="Itinéraire GPS"
-                            className="flex items-center gap-1.5 bg-nexans-dark hover:bg-nexans text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 shadow-sm"
-                        >
-                            <Navigation className="w-3.5 h-3.5" />
-                            <span>Itinéraire</span>
-                        </button>
+                        {/* ── ACTION CARDS ── */}
+                        <div className="grid grid-cols-3 gap-2 flex-[25] min-h-0">
+                            <ActionCard
+                                icon={<FileText className="w-5 h-5 text-nexans" />}
+                                title="Documents"
+                                onClick={() => {
+                                    const url = project.folderpath ?? project.FolderPath ?? project.ProjectPath;
+                                    if (url) {
+                                        window.open(url, '_blank');
+                                    } else {
+                                        console.warn('No folderpath found in project JSON');
+                                    }
+                                }}
+                                color="primary"
+                            />
+                            <ActionCard
+                                icon={<ClipboardEdit className="w-5 h-5 text-nexans" />}
+                                title="Rapport"
+                                onClick={() => setIsRapportOpen(true)}
+                                color="secondary"
+                            />
+                            <ActionCard
+                                icon={<Camera className="w-5 h-5 text-nexans" />}
+                                title="Photo"
+                                onClick={handlePhotoTrigger}
+                                color="primary"
+                            />
+                        </div>
                     </div>
-                </header>
-
-                {/* ── SCHÉMA UNIFILAIRE ── */}
-                {hasSchema ? (
-                    /* Full featured card when schema exists */
-                    <button
-                        onClick={() => setCurrentView('schema')}
-                        className="w-full flex flex-row items-center gap-4 bg-white rounded-2xl shadow-sm px-4 py-4 hover:shadow-md transition-all active:scale-[0.99] group overflow-hidden flex-[35] min-h-0"
-                    >
-                        <div className="w-1 self-stretch rounded-full bg-gradient-to-b from-nexans to-nexans-light flex-shrink-0" />
-                        <div className="p-3 rounded-xl bg-nexans-light/10 flex-shrink-0 group-hover:bg-nexans-light/20 transition-colors">
-                            <Activity className="w-7 h-7 text-nexans" />
-                        </div>
-                        <div className="flex flex-col items-start text-left flex-1">
-                            <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Vue principale</span>
-                            <h2 className="text-sm font-bold text-gray-900 group-hover:text-nexans transition-colors leading-tight">
-                                Schéma Unifilaire
-                            </h2>
-                            <p className="text-xs text-gray-500 mt-0.5">Visualiser le schéma du Chantier</p>
-                        </div>
-                        <svg className="w-5 h-5 text-gray-300 group-hover:text-nexans transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                ) : (
-                    /* Compact card when no schema — capped at 35% height */
-                    <button
-                        onClick={() => setCurrentView('schema')}
-                        style={{ maxHeight: '35%' }}
-                        className="w-full flex flex-row items-center gap-3 bg-white/70 border border-dashed border-gray-200 rounded-xl px-3 py-2.5 hover:bg-white hover:border-nexans/30 hover:shadow-sm transition-all active:scale-[0.99] group overflow-hidden flex-[35] min-h-0"
-                    >
-                        <div className="p-2 rounded-lg bg-gray-100 group-hover:bg-nexans-light/10 flex-shrink-0 transition-colors">
-                            <Activity className="w-4 h-4 text-gray-400 group-hover:text-nexans transition-colors" />
-                        </div>
-                        <div className="flex flex-col items-start text-left flex-1 min-w-0">
-                            <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Schéma Unifilaire</span>
-                            <p className="text-[10px] text-gray-400 italic truncate">Aucun schéma disponible</p>
-                        </div>
-                        <svg className="w-4 h-4 text-gray-300 group-hover:text-nexans transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                    </button>
-                )}
-
-                {/* ── ACTION CARDS ── */}
-                <div className="grid grid-cols-3 gap-2 flex-[25] min-h-0">
-                    <ActionCard
-                        icon={<FileText className="w-5 h-5 text-nexans" />}
-                        title="Documents"
-                        onClick={() => console.log('Open Documents')}
-                        color="primary"
-                    />
-                    <ActionCard
-                        icon={<ClipboardEdit className="w-5 h-5 text-nexans" />}
-                        title="Rapport"
-                        onClick={() => setIsRapportOpen(true)}
-                        color="secondary"
-                    />
-                    <ActionCard
-                        icon={<Camera className="w-5 h-5 text-nexans" />}
-                        title="Photo"
-                        onClick={handlePhotoTrigger}
-                        color="primary"
-                    />
                 </div>
-            </div>
+            )}
 
             {/* Contact Modal */}
             <ContactModal
@@ -311,10 +319,15 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                 isOpen={isPhotoOpen}
                 onClose={() => {
                     setIsPhotoOpen(false);
-                    if (onOutputChange) onOutputChange('PhotoTrigger', false);
+                }}
+                onPhotoCapture={(base64) => {
+                    if (onOutputChange) {
+                        onOutputChange('PhotoBase64', base64);
+                        onOutputChange('PhotoTrigger', true);
+                    }
                 }}
             />
-        </div>
+        </>
     );
 };
 
@@ -589,9 +602,88 @@ const RapportPanel: React.FC<RapportPanelProps> = ({ isOpen, onClose, onSubmit }
 interface PhotoPanelProps {
     isOpen: boolean;
     onClose: () => void;
+    onPhotoCapture: (base64: string) => void;
 }
 
-const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose }) => {
+type PhotoMode = 'streaming' | 'preview';
+
+const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+    const [mode, setMode] = useState<PhotoMode>('streaming');
+    const [capturedImage, setCapturedImage] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const stopStream = useCallback(() => {
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+        }
+    }, []);
+
+    const startStream = useCallback(async () => {
+        setError(null);
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'environment' }
+            });
+            streamRef.current = stream;
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+            }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Erreur inconnue';
+            if (message.includes('Permission') || message.includes('NotAllowed')) {
+                setError('Permission caméra refusée. Veuillez autoriser l\'accès.');
+            } else {
+                setError('Impossible d\'accéder à la caméra : ' + message);
+            }
+        }
+    }, []);
+
+    useEffect(() => {
+        if (isOpen) {
+            setMode('streaming');
+            setCapturedImage(null);
+            setError(null);
+            void startStream();
+        } else {
+            stopStream();
+        }
+        return () => stopStream();
+    }, [isOpen, startStream, stopStream]);
+
+    const handleCapture = useCallback(() => {
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        if (!video || !canvas) return;
+
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.drawImage(video, 0, 0);
+        const base64 = canvas.toDataURL('image/jpeg', 0.8);
+        setCapturedImage(base64);
+        setMode('preview');
+        stopStream();
+    }, [stopStream]);
+
+    const handleRetake = useCallback(() => {
+        setCapturedImage(null);
+        setMode('streaming');
+        void startStream();
+    }, [startStream]);
+
+    const handleValidate = useCallback(() => {
+        if (capturedImage) {
+            onPhotoCapture(capturedImage);
+            onClose();
+        }
+    }, [capturedImage, onPhotoCapture, onClose]);
+
     if (!isOpen) return null;
 
     return (
@@ -627,23 +719,65 @@ const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose }) => {
                 {/* Divider */}
                 <div className="h-px bg-gray-100 mx-4 flex-shrink-0" />
 
-                {/* Camera zone */}
-                <div className="flex-1 p-4">
-                    <div className="w-full h-full flex flex-col items-center justify-center bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl">
-                        <Camera className="w-12 h-12 text-gray-300 mb-3" />
-                        <p className="text-sm font-medium text-gray-400">Zone caméra</p>
-                        <p className="text-xs text-gray-300 mt-1">En attente du flux vidéo</p>
-                    </div>
+                {/* Camera / Preview zone */}
+                <div className="flex-1 p-4 overflow-hidden">
+                    {error ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-red-50 border-2 border-dashed border-red-200 rounded-xl">
+                            <Camera className="w-12 h-12 text-red-300 mb-3" />
+                            <p className="text-sm font-medium text-red-500 text-center px-4">{error}</p>
+                        </div>
+                    ) : mode === 'streaming' ? (
+                        <video
+                            ref={videoRef}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="w-full h-full object-cover rounded-xl bg-black"
+                        />
+                    ) : (
+                        <img
+                            src={capturedImage ?? undefined}
+                            alt="Photo capturée"
+                            className="w-full h-full object-cover rounded-xl"
+                        />
+                    )}
+                    <canvas ref={canvasRef} className="hidden" />
                 </div>
 
                 {/* Footer */}
-                <div className="px-4 pb-4 flex-shrink-0">
-                    <button
-                        onClick={onClose}
-                        className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl transition-all text-sm"
-                    >
-                        Fermer
-                    </button>
+                <div className="px-4 pb-4 flex-shrink-0 flex gap-2">
+                    {mode === 'streaming' && !error && (
+                        <button
+                            onClick={handleCapture}
+                            className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 rounded-xl transition-all text-sm"
+                        >
+                            Capturer
+                        </button>
+                    )}
+                    {mode === 'preview' && (
+                        <>
+                            <button
+                                onClick={handleRetake}
+                                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl transition-all text-sm"
+                            >
+                                Reprendre
+                            </button>
+                            <button
+                                onClick={handleValidate}
+                                className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-2.5 rounded-xl transition-all text-sm"
+                            >
+                                Valider
+                            </button>
+                        </>
+                    )}
+                    {(mode === 'streaming' || error) && (
+                        <button
+                            onClick={onClose}
+                            className={`${error ? 'flex-1' : ''} bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 px-4 rounded-xl transition-all text-sm`}
+                        >
+                            Fermer
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
