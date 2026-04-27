@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest>
-  <control namespace="Nexans" constructor="MenuChantier" version="0.0.10" display-name-key="MenuChantier" description-key="MenuChantier description" control-type="standard" >
+  <control namespace="Nexans" constructor="MenuChantier" version="2.0.0" display-name-key="MenuChantier" description-key="MenuChantier description" control-type="standard" >
     <!--external-service-usage node declares whether this 3rd party PCF control is using external service or not, if yes, this control will be considered as premium and please also add the external domain it is using.
     If it is not using any external service, please set the enabled="false" and DO NOT add any domain below. The "enabled" will be false by default.
     Example1:
@@ -26,6 +26,8 @@
     <property name="RapportTimestamp" display-name-key="RapportTimestamp" description-key="RapportTimestamp" of-type="SingleLine.Text" usage="output" />
     <property name="PhotoTrigger" display-name-key="PhotoTrigger" description-key="PhotoTrigger" of-type="TwoOptions" usage="output" />
     <property name="PhotoBase64" display-name-key="PhotoBase64" description-key="PhotoBase64" of-type="SingleLine.Text" usage="output" />
+    <property name="Point5MinJSON" display-name-key="Point5MinJSON" description-key="Point5MinJSON" of-type="SingleLine.Text" usage="output" />
+    <property name="Point5MinTimestamp" display-name-key="Point5MinTimestamp" description-key="Point5MinTimestamp" of-type="SingleLine.Text" usage="output" />
     <!--
       Property node's of-type attribute can be of-type-group attribute.
       Example:

@@ -2,6 +2,8 @@ import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react'
 import { MapPin, FileText, Activity, ClipboardEdit, Navigation, Camera, Phone, X, User, Mic } from './Icons';
 import { SchemaView } from './SchemaComponents';
 import type { SchemaElement, SchemaData } from './SchemaComponents';
+import { Point5MinNotification, Point5MinPanel } from './Point5MinPanel';
+import type { Point5MinData } from './Point5MinPanel';
 
 // =============================================
 // TYPES
@@ -66,6 +68,8 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
     const [currentView, setCurrentView] = useState<ViewType>('menu');
     const [selectedElement, setSelectedElement] = useState<SchemaElement | null>(null);
     const [isPhotoOpen, setIsPhotoOpen] = useState(false);
+    const [isPoint5MinOpen, setIsPoint5MinOpen] = useState(false);
+    const [showPoint5MinBanner, setShowPoint5MinBanner] = useState(false);
 
     const [breakpoint, setBreakpoint] = useState<Breakpoint>('mobile');
     const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
@@ -90,6 +94,17 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
             return null;
         }
     }, [projectJSON]);
+
+    const projectTitle = project?.Title ?? '';
+
+    useEffect(() => {
+        if (!projectTitle) return;
+        const today = new Date().toISOString().split('T')[0];
+        const key = `p5m_done_${encodeURIComponent(projectTitle)}_${today}`;
+        if (!localStorage.getItem(key)) {
+            setShowPoint5MinBanner(true);
+        }
+    }, [projectTitle]);
 
     const contacts = useMemo((): ContactData[] => {
         if (!project?.Contact) return [];
@@ -130,6 +145,18 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
         setIsPhotoOpen(true);
         if (onOutputChange) {
             onOutputChange('PhotoTrigger', true);
+        }
+    };
+
+    const handlePoint5MinSubmit = (data: Point5MinData) => {
+        const today = new Date().toISOString().split('T')[0];
+        const key = `p5m_done_${encodeURIComponent(projectTitle)}_${today}`;
+        localStorage.setItem(key, '1');
+        setShowPoint5MinBanner(false);
+        setIsPoint5MinOpen(false);
+        if (onOutputChange) {
+            onOutputChange('Point5MinJSON', JSON.stringify(data));
+            onOutputChange('Point5MinTimestamp', new Date().toISOString());
         }
     };
 
@@ -284,6 +311,15 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                             <span className="text-[13px] font-semibold text-[#222] text-center leading-tight">Photo</span>
                         </button>
                     </div>
+
+                    {/* ── Point 5 min daily notification ── */}
+                    {showPoint5MinBanner && !isPoint5MinOpen && (
+                        <Point5MinNotification
+                            projectTitle={projectTitle}
+                            onOpen={() => setIsPoint5MinOpen(true)}
+                            onDismiss={() => setShowPoint5MinBanner(false)}
+                        />
+                    )}
                 </div>
             )}
 
@@ -318,6 +354,14 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                         onOutputChange('PhotoTrigger', true);
                     }
                 }}
+            />
+
+            {/* Point 5 min Panel */}
+            <Point5MinPanel
+                isOpen={isPoint5MinOpen}
+                projectTitle={projectTitle}
+                onClose={() => setIsPoint5MinOpen(false)}
+                onSubmit={handlePoint5MinSubmit}
             />
         </>
     );
