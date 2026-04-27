@@ -67,7 +67,6 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
     const [selectedElement, setSelectedElement] = useState<SchemaElement | null>(null);
     const [isPhotoOpen, setIsPhotoOpen] = useState(false);
 
-    // Responsive breakpoint via ResizeObserver
     const [breakpoint, setBreakpoint] = useState<Breakpoint>('mobile');
     const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
 
@@ -136,7 +135,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
 
     if (!project) {
         return (
-            <div style={{ fontFamily: "'Inter', sans-serif" }} className="flex items-center justify-center h-full w-full bg-slate-50 text-gray-400 text-sm">
+            <div style={{ fontFamily: "'DM Sans', sans-serif" }} className="flex items-center justify-center h-full w-full bg-[#F4F4F6] text-gray-400 text-sm">
                 Aucun projet sélectionné.
             </div>
         );
@@ -144,6 +143,9 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
 
     const isMobile = breakpoint === 'mobile';
     const hasSchema = !!schemaData?.ordreSchema?.trim();
+    const pmInitials = project.PM
+        ? project.PM.split(' ').map((w: string) => w[0] ?? '').join('').slice(0, 2).toUpperCase()
+        : '?';
 
     return (
         <>
@@ -159,138 +161,128 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
             ) : (
                 <div
                     ref={(el: HTMLDivElement | null) => setContainerRef(el)}
-                    style={{ fontFamily: "'Inter', sans-serif" }}
-                    className={`w-full h-full overflow-hidden bg-slate-50 flex flex-col ${isMobile ? 'pb-[100px]' : ''}`}
+                    style={{ fontFamily: "'DM Sans', sans-serif" }}
+                    className={`w-full h-full overflow-y-auto bg-[#F4F4F6] flex flex-col ${isMobile ? 'pb-[100px]' : ''}`}
                 >
+                    {/* ── Red Header ── */}
+                    <div className="bg-[#C41230] px-6 pt-5 pb-6 text-white flex-shrink-0">
+                        <div className="text-[11px] font-semibold uppercase tracking-[1.5px] opacity-70 mb-1">
+                            Chantier en cours
+                        </div>
+                        <div className="text-[28px] font-bold tracking-[-0.5px] mb-4 leading-tight">
+                            {project.Title}
+                        </div>
 
-                    {/* ── Subtle top accent bar ── */}
-                    <div className="h-1 w-full bg-gradient-to-r from-nexans to-nexans-light flex-shrink-0" />
-
-                    {/* ── Main content ── */}
-                    <div className="flex flex-col flex-1 p-2 gap-2 overflow-hidden">
-
-                        {/* ── HEADER ── */}
-                        <header className="flex flex-col bg-white rounded-2xl shadow-sm px-4 py-4 gap-2 flex-[20] min-h-0 justify-center">
-                            {/* Top row: label + title */}
-                            <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 flex-shrink-0 whitespace-nowrap">
-                                    Chantier en cours
-                                </span>
-                                <span className="text-gray-300 flex-shrink-0">·</span>
-                                <h1 className="text-base font-bold text-nexans truncate leading-tight">
-                                    {project.Title}
-                                </h1>
+                        {project.PM && (
+                            <div className="flex items-center gap-[10px] bg-white/[0.12] rounded-[14px] px-[14px] py-[10px] mb-[14px]">
+                                <div className="w-9 h-9 rounded-full bg-white/25 flex items-center justify-center text-[15px] font-bold flex-shrink-0">
+                                    {pmInitials}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <div className="text-[14px] font-semibold truncate">{project.PM}</div>
+                                    <div className="text-[12px] opacity-70 mt-[1px]">Chef de projet</div>
+                                </div>
                             </div>
-
-                            {/* Info row: PM + Address */}
-                            {(project.PM || project.AddressChantier) && (
-                                <div className="flex flex-col gap-1 text-xs text-gray-500">
-                                    {project.PM && (
-                                        <div className="flex items-center gap-1.5">
-                                            <User className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                            <span className="truncate">{project.PM}</span>
-                                        </div>
-                                    )}
-                                    {project.AddressChantier && (
-                                        <div className="flex items-center gap-1.5">
-                                            <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                                            <span className="truncate">{project.AddressChantier}</span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* Buttons row */}
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => setIsContactModalOpen(true)}
-                                    title="Contacts chantier"
-                                    className="flex items-center gap-1.5 bg-nexans hover:bg-nexans-dark text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 shadow-sm"
-                                >
-                                    <Phone className="w-3.5 h-3.5" />
-                                    <span>Contacts</span>
-                                </button>
-                                <button
-                                    onClick={handleOpenGPS}
-                                    title="Itinéraire GPS"
-                                    className="flex items-center gap-1.5 bg-nexans-dark hover:bg-nexans text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 shadow-sm"
-                                >
-                                    <Navigation className="w-3.5 h-3.5" />
-                                    <span>Itinéraire</span>
-                                </button>
-                            </div>
-                        </header>
-
-                        {/* ── SCHÉMA UNIFILAIRE ── */}
-                        {hasSchema ? (
-                            /* Full featured card when schema exists */
-                            <button
-                                onClick={() => setCurrentView('schema')}
-                                className="w-full flex flex-row items-center gap-4 bg-white rounded-2xl shadow-sm px-4 py-4 hover:shadow-md transition-all active:scale-[0.99] group overflow-hidden flex-[35] min-h-0"
-                            >
-                                <div className="w-1 self-stretch rounded-full bg-gradient-to-b from-nexans to-nexans-light flex-shrink-0" />
-                                <div className="p-3 rounded-xl bg-nexans-light/10 flex-shrink-0 group-hover:bg-nexans-light/20 transition-colors">
-                                    <Activity className="w-7 h-7 text-nexans" />
-                                </div>
-                                <div className="flex flex-col items-start text-left flex-1">
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-gray-400 mb-0.5">Vue principale</span>
-                                    <h2 className="text-sm font-bold text-gray-900 group-hover:text-nexans transition-colors leading-tight">
-                                        Schéma Unifilaire
-                                    </h2>
-                                    <p className="text-xs text-gray-500 mt-0.5">Visualiser le schéma du Chantier</p>
-                                </div>
-                                <svg className="w-5 h-5 text-gray-300 group-hover:text-nexans transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                                </svg>
-                            </button>
-                        ) : (
-                            /* Compact card when no schema — capped at 35% height */
-                            <button
-                                onClick={() => setCurrentView('schema')}
-                                style={{ maxHeight: '35%' }}
-                                className="w-full flex flex-row items-center gap-3 bg-white/70 border border-dashed border-gray-200 rounded-xl px-3 py-2.5 hover:bg-white hover:border-nexans/30 hover:shadow-sm transition-all active:scale-[0.99] group overflow-hidden flex-[35] min-h-0"
-                            >
-                                <div className="p-2 rounded-lg bg-gray-100 group-hover:bg-nexans-light/10 flex-shrink-0 transition-colors">
-                                    <Activity className="w-4 h-4 text-gray-400 group-hover:text-nexans transition-colors" />
-                                </div>
-                                <div className="flex flex-col items-start text-left flex-1 min-w-0">
-                                    <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Schéma Unifilaire</span>
-                                    <p className="text-[10px] text-gray-400 italic truncate">Aucun schéma disponible</p>
-                                </div>
-                                <svg className="w-4 h-4 text-gray-300 group-hover:text-nexans transition-colors flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                                </svg>
-                            </button>
                         )}
 
-                        {/* ── ACTION CARDS ── */}
-                        <div className="grid grid-cols-3 gap-2 flex-[25] min-h-0">
-                            <ActionCard
-                                icon={<FileText className="w-5 h-5 text-nexans" />}
-                                title="Documents"
-                                onClick={() => {
-                                    const url = project.folderpath ?? project.FolderPath ?? project.ProjectPath;
-                                    if (url) {
-                                        window.open(url, '_blank');
-                                    } else {
-                                        console.warn('No folderpath found in project JSON');
-                                    }
-                                }}
-                                color="primary"
-                            />
-                            <ActionCard
-                                icon={<ClipboardEdit className="w-5 h-5 text-nexans" />}
-                                title="Rapport"
-                                onClick={() => setIsRapportOpen(true)}
-                                color="secondary"
-                            />
-                            <ActionCard
-                                icon={<Camera className="w-5 h-5 text-nexans" />}
-                                title="Photo"
-                                onClick={handlePhotoTrigger}
-                                color="primary"
-                            />
+                        <div className="flex gap-[10px]">
+                            <button
+                                onClick={() => setIsContactModalOpen(true)}
+                                className="flex-1 h-12 rounded-[14px] border-2 border-white/35 bg-white/10 text-white text-[14px] font-semibold flex items-center justify-center gap-[6px] active:bg-white/25 transition-all"
+                            >
+                                <Phone className="w-4 h-4" />
+                                Contacts
+                            </button>
+                            <button
+                                onClick={handleOpenGPS}
+                                className="flex-1 h-12 rounded-[14px] border-2 border-white/35 bg-white/10 text-white text-[14px] font-semibold flex items-center justify-center gap-[6px] active:bg-white/25 transition-all"
+                            >
+                                <Navigation className="w-4 h-4" />
+                                Itinéraire
+                            </button>
                         </div>
+                    </div>
+
+                    {/* ── Location bar ── */}
+                    {project.AddressChantier && (
+                        <div className="bg-white px-6 py-3 flex items-center gap-2 border-b border-[#F0F0F0] flex-shrink-0">
+                            <MapPin className="w-3.5 h-3.5 text-[#C41230] flex-shrink-0" />
+                            <span className="text-[13px] text-[#666] truncate">{project.AddressChantier}</span>
+                        </div>
+                    )}
+
+                    {/* ── Vue principale ── */}
+                    <div className="text-[11px] font-bold uppercase tracking-[1.5px] text-[#999] px-6 pt-5 pb-[10px] flex-shrink-0">
+                        Vue principale
+                    </div>
+
+                    <div className="mx-4 bg-white rounded-[20px] overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.07)] flex-shrink-0">
+                        <button
+                            onClick={() => setCurrentView('schema')}
+                            className="w-full flex items-center gap-4 px-5 py-[18px] active:bg-gray-50 transition-all text-left"
+                        >
+                            <div className="w-[52px] h-[52px] rounded-[14px] bg-[#FEE8EC] flex items-center justify-center flex-shrink-0">
+                                <Activity className="w-6 h-6 text-[#C41230]" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="text-[11px] font-semibold uppercase tracking-[1px] text-[#999] mb-[3px]">
+                                    Schéma
+                                </div>
+                                <div className="text-[17px] font-bold text-[#111] leading-tight">
+                                    Schéma Unifilaire
+                                </div>
+                                <div className="text-[13px] text-[#888] mt-[2px]">
+                                    {hasSchema ? 'Visualiser le schéma du chantier' : 'Aucun schéma disponible'}
+                                </div>
+                            </div>
+                            <svg className="w-[18px] h-[18px] text-[#C41230] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                                <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    {/* ── Actions rapides ── */}
+                    <div className="text-[11px] font-bold uppercase tracking-[1.5px] text-[#999] px-6 pt-5 pb-[10px] flex-shrink-0">
+                        Actions rapides
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 px-4 pb-6 flex-shrink-0">
+                        <button
+                            onClick={() => {
+                                const url = project.folderpath ?? project.FolderPath ?? project.ProjectPath;
+                                if (url) {
+                                    window.open(url, '_blank');
+                                } else {
+                                    console.warn('No folderpath found in project JSON');
+                                }
+                            }}
+                            className="bg-white rounded-[20px] px-3 py-5 flex flex-col items-center gap-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.07)] active:scale-[0.96] transition-all border-none"
+                        >
+                            <div className="w-[52px] h-[52px] rounded-[16px] bg-[#FEE8EC] flex items-center justify-center">
+                                <FileText className="w-6 h-6 text-[#C41230]" />
+                            </div>
+                            <span className="text-[13px] font-semibold text-[#222] text-center leading-tight">Documents</span>
+                        </button>
+
+                        <button
+                            onClick={() => setIsRapportOpen(true)}
+                            className="bg-white rounded-[20px] px-3 py-5 flex flex-col items-center gap-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.07)] active:scale-[0.96] transition-all border-none"
+                        >
+                            <div className="w-[52px] h-[52px] rounded-[16px] bg-[#FEE8EC] flex items-center justify-center">
+                                <ClipboardEdit className="w-6 h-6 text-[#C41230]" />
+                            </div>
+                            <span className="text-[13px] font-semibold text-[#222] text-center leading-tight">Rapport</span>
+                        </button>
+
+                        <button
+                            onClick={handlePhotoTrigger}
+                            className="bg-white rounded-[20px] px-3 py-5 flex flex-col items-center gap-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.07)] active:scale-[0.96] transition-all border-none"
+                        >
+                            <div className="w-[52px] h-[52px] rounded-[16px] bg-[#FEE8EC] flex items-center justify-center">
+                                <Camera className="w-6 h-6 text-[#C41230]" />
+                            </div>
+                            <span className="text-[13px] font-semibold text-[#222] text-center leading-tight">Photo</span>
+                        </button>
                     </div>
                 </div>
             )}
@@ -332,36 +324,6 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
 };
 
 // =============================================
-// ACTION CARD
-// =============================================
-
-interface ActionCardProps {
-    icon: React.ReactNode;
-    title: string;
-    onClick: () => void;
-    color: 'primary' | 'secondary';
-}
-
-const ActionCard: React.FC<ActionCardProps> = ({ icon, title, onClick, color }) => {
-    const bg = color === 'primary'
-        ? 'bg-nexans/10 group-hover:bg-nexans/20'
-        : 'bg-nexans-light/10 group-hover:bg-nexans-light/20';
-    return (
-        <button
-            onClick={onClick}
-            className="flex flex-col items-center justify-center gap-3 bg-white rounded-2xl shadow-sm p-4 text-center transition-all active:scale-95 hover:shadow-md group h-full"
-        >
-            <div className={`p-3 rounded-xl ${bg} transition-colors`}>
-                {icon}
-            </div>
-            <span className="text-xs font-semibold text-gray-700 group-hover:text-gray-900 leading-tight">
-                {title}
-            </span>
-        </button>
-    );
-};
-
-// =============================================
 // CONTACT MODAL
 // =============================================
 
@@ -376,7 +338,7 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, contacts }
 
     return (
         <div
-            style={{ fontFamily: "'Inter', sans-serif" }}
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
             onClick={onClose}
         >
@@ -384,12 +346,10 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, contacts }
                 className="w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Drag handle */}
                 <div className="flex justify-center pt-3">
                     <div className="w-8 h-1 bg-gray-200 rounded-full" />
                 </div>
 
-                {/* Header */}
                 <div className="flex items-center justify-between px-4 pt-3 pb-2">
                     <div>
                         <h2 className="text-base font-bold text-gray-900">Contacts Chantier</h2>
@@ -403,17 +363,14 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, contacts }
                     </button>
                 </div>
 
-                {/* Divider */}
                 <div className="h-px bg-gray-100 mx-4" />
 
-                {/* Content */}
                 <div className="p-4 space-y-3 max-h-64 overflow-y-auto">
                     {contacts.length === 0 && (
                         <p className="text-xs text-gray-400 italic">Aucune information de contact</p>
                     )}
                     {contacts.map((c, i) => (
                         <div key={i} className="rounded-xl border border-gray-100 p-3 space-y-2">
-                            {/* Type badge + Name */}
                             <div className="flex items-center gap-2">
                                 <div className="p-1.5 bg-nexans/10 rounded-lg">
                                     <User className="w-4 h-4 text-nexans" />
@@ -448,7 +405,6 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, contacts }
                     ))}
                 </div>
 
-                {/* Footer */}
                 <div className="px-4 pb-5">
                     <button
                         onClick={onClose}
@@ -529,7 +485,7 @@ const RapportPanel: React.FC<RapportPanelProps> = ({ isOpen, onClose, onSubmit }
 
     return (
         <div
-            style={{ fontFamily: "'Inter', sans-serif" }}
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
             onClick={onClose}
         >
@@ -537,12 +493,10 @@ const RapportPanel: React.FC<RapportPanelProps> = ({ isOpen, onClose, onSubmit }
                 className="w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Drag handle */}
                 <div className="flex justify-center pt-3">
                     <div className="w-8 h-1 bg-gray-200 rounded-full" />
                 </div>
 
-                {/* Header */}
                 <div className="flex items-center justify-between px-4 pt-3 pb-2">
                     <div>
                         <h2 className="text-base font-bold text-gray-900">Rapport de chantier</h2>
@@ -556,10 +510,8 @@ const RapportPanel: React.FC<RapportPanelProps> = ({ isOpen, onClose, onSubmit }
                     </button>
                 </div>
 
-                {/* Divider */}
                 <div className="h-px bg-gray-100 mx-4" />
 
-                {/* Content */}
                 <div className="p-4 space-y-3">
                     <div className="relative">
                         <textarea
@@ -568,7 +520,6 @@ const RapportPanel: React.FC<RapportPanelProps> = ({ isOpen, onClose, onSubmit }
                             placeholder="Décrivez l'avancement du chantier..."
                             className="w-full min-h-[120px] border border-gray-200 rounded-xl p-3 pr-12 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-nexans/30 focus:border-nexans"
                         />
-                        {/* Mic button */}
                         <button
                             onClick={toggleRecording}
                             disabled={!speechAvailable}
@@ -581,7 +532,6 @@ const RapportPanel: React.FC<RapportPanelProps> = ({ isOpen, onClose, onSubmit }
                         </button>
                     </div>
 
-                    {/* Submit */}
                     <button
                         onClick={handleSubmit}
                         disabled={!text.trim()}
@@ -605,14 +555,12 @@ interface PhotoPanelProps {
     onPhotoCapture: (base64: string) => void;
 }
 
-type PhotoMode = 'streaming' | 'preview';
-
 const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
-    const [mode, setMode] = useState<PhotoMode>('streaming');
-    const [capturedImage, setCapturedImage] = useState<string | null>(null);
+    const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
+    const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const stopStream = useCallback(() => {
@@ -644,8 +592,8 @@ const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture
 
     useEffect(() => {
         if (isOpen) {
-            setMode('streaming');
-            setCapturedImage(null);
+            setCapturedPhotos([]);
+            setSelectedIndex(null);
             setError(null);
             void startStream();
         } else {
@@ -666,118 +614,160 @@ const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture
 
         ctx.drawImage(video, 0, 0);
         const base64 = canvas.toDataURL('image/jpeg', 0.8);
-        setCapturedImage(base64);
-        setMode('preview');
-        stopStream();
-    }, [stopStream]);
+        setCapturedPhotos(prev => [...prev, base64]);
+    }, []);
 
-    const handleRetake = useCallback(() => {
-        setCapturedImage(null);
-        setMode('streaming');
-        void startStream();
-    }, [startStream]);
+    const handleDelete = useCallback((index: number) => {
+        setCapturedPhotos(prev => prev.filter((_, i) => i !== index));
+        setSelectedIndex(null);
+    }, []);
 
     const handleValidate = useCallback(() => {
-        if (capturedImage) {
-            onPhotoCapture(capturedImage);
-            onClose();
-        }
-    }, [capturedImage, onPhotoCapture, onClose]);
+        if (capturedPhotos.length === 0) return;
+        onPhotoCapture(JSON.stringify(capturedPhotos));
+        onClose();
+    }, [capturedPhotos, onPhotoCapture, onClose]);
 
     if (!isOpen) return null;
 
     return (
         <div
-            style={{ fontFamily: "'Inter', sans-serif" }}
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
             onClick={onClose}
         >
             <div
-                style={{ height: '70%' }}
-                className="w-full max-w-md mx-4 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+                style={{ height: '75%' }}
+                className="w-full max-w-md mx-4 bg-white rounded-[24px] shadow-2xl overflow-hidden flex flex-col"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Drag handle */}
-                <div className="flex justify-center pt-3 flex-shrink-0">
-                    <div className="w-8 h-1 bg-gray-200 rounded-full" />
-                </div>
-
-                {/* Header */}
-                <div className="flex items-center justify-between px-4 pt-3 pb-2 flex-shrink-0">
-                    <div>
-                        <h2 className="text-base font-bold text-gray-900">Photo Chantier</h2>
-                        <p className="text-xs text-gray-400">Capture photo du chantier</p>
-                    </div>
+                {/* Red header */}
+                <div className="bg-[#C41230] px-5 py-4 flex items-center gap-3 flex-shrink-0">
                     <button
                         onClick={onClose}
-                        className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
+                        className="w-10 h-10 rounded-[12px] bg-white/15 flex items-center justify-center flex-shrink-0 active:bg-white/25 transition-all"
                     >
-                        <X className="w-4 h-4 text-gray-500" />
+                        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="15 18 9 12 15 6" />
+                        </svg>
                     </button>
+                    <div>
+                        <h2 className="text-[18px] font-bold text-white leading-tight">Photos Chantier</h2>
+                        <p className="text-[12px] text-white/70">
+                            {capturedPhotos.length > 0 ? `${capturedPhotos.length} photo${capturedPhotos.length > 1 ? 's' : ''} prise${capturedPhotos.length > 1 ? 's' : ''}` : 'Capture photo du chantier'}
+                        </p>
+                    </div>
                 </div>
 
-                {/* Divider */}
-                <div className="h-px bg-gray-100 mx-4 flex-shrink-0" />
-
-                {/* Camera / Preview zone */}
-                <div className="flex-1 p-4 overflow-hidden">
+                {/* Camera zone + thumbnail strip */}
+                <div className="flex-1 p-4 overflow-hidden flex flex-col gap-3">
                     {error ? (
-                        <div className="w-full h-full flex flex-col items-center justify-center bg-red-50 border-2 border-dashed border-red-200 rounded-xl">
+                        <div className="flex-1 flex flex-col items-center justify-center bg-red-50 border-2 border-dashed border-red-200 rounded-[20px]">
                             <Camera className="w-12 h-12 text-red-300 mb-3" />
                             <p className="text-sm font-medium text-red-500 text-center px-4">{error}</p>
                         </div>
-                    ) : mode === 'streaming' ? (
-                        <video
-                            ref={videoRef}
-                            autoPlay
-                            playsInline
-                            muted
-                            className="w-full h-full object-cover rounded-xl bg-black"
-                        />
                     ) : (
-                        <img
-                            src={capturedImage ?? undefined}
-                            alt="Photo capturée"
-                            className="w-full h-full object-cover rounded-xl"
-                        />
+                        <>
+                            {/* Viewfinder — always streaming */}
+                            <div className="relative rounded-[20px] overflow-hidden bg-[#1a1a1a] flex-1">
+                                <video
+                                    ref={videoRef}
+                                    autoPlay
+                                    playsInline
+                                    muted
+                                    className="w-full h-full object-cover"
+                                />
+                                {/* Camera grid overlay */}
+                                <div
+                                    className="absolute inset-0 pointer-events-none"
+                                    style={{
+                                        backgroundImage: 'linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)',
+                                        backgroundSize: '33.33% 33.33%',
+                                    }}
+                                />
+
+                                {/* Lightbox overlay — shown when a thumbnail is tapped */}
+                                {selectedIndex !== null && (
+                                    <div className="absolute inset-0 bg-black/92 flex flex-col z-10">
+                                        <button
+                                            onClick={() => setSelectedIndex(null)}
+                                            className="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/20 flex items-center justify-center active:bg-white/35 transition-all z-20"
+                                        >
+                                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                                            </svg>
+                                        </button>
+                                        <img
+                                            src={capturedPhotos[selectedIndex]}
+                                            alt={`Photo ${selectedIndex + 1}`}
+                                            className="flex-1 object-contain w-full"
+                                        />
+                                        <div className="flex justify-center pb-4 pt-2 flex-shrink-0">
+                                            <button
+                                                onClick={() => handleDelete(selectedIndex)}
+                                                className="h-[44px] px-6 bg-[#C41230] text-white rounded-[14px] font-semibold text-sm flex items-center gap-2 active:bg-[#a00f28] transition-all"
+                                            >
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                                                    <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
+                                                </svg>
+                                                Supprimer
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Thumbnail strip — visible once at least 1 photo captured */}
+                            {capturedPhotos.length > 0 && (
+                                <div className="flex gap-2 overflow-x-auto flex-shrink-0 pb-1" style={{ scrollbarWidth: 'none' }}>
+                                    {capturedPhotos.map((src, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => setSelectedIndex(idx)}
+                                            className="relative flex-shrink-0 w-[64px] h-[64px] rounded-[10px] overflow-hidden border-2 transition-all"
+                                            style={{ borderColor: selectedIndex === idx ? '#C41230' : 'transparent' }}
+                                        >
+                                            <img src={src} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover" />
+                                            <span className="absolute bottom-0 right-0 bg-black/60 text-white font-bold px-1 rounded-tl-[6px]" style={{ fontSize: '9px' }}>
+                                                {idx + 1}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </>
                     )}
                     <canvas ref={canvasRef} className="hidden" />
                 </div>
 
-                {/* Footer */}
-                <div className="px-4 pb-4 flex-shrink-0 flex gap-2">
-                    {mode === 'streaming' && !error && (
+                {/* Footer buttons */}
+                <div className="px-4 pb-5 flex-shrink-0 flex gap-[10px]">
+                    {!error && (
                         <button
                             onClick={handleCapture}
-                            className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 rounded-xl transition-all text-sm"
+                            className="flex-[2] h-[60px] bg-[#C41230] text-white rounded-[16px] font-bold text-[16px] flex items-center justify-center gap-2 active:bg-[#a00f28] transition-all"
                         >
+                            <Camera className="w-5 h-5" />
                             Capturer
                         </button>
                     )}
-                    {mode === 'preview' && (
-                        <>
-                            <button
-                                onClick={handleRetake}
-                                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl transition-all text-sm"
-                            >
-                                Reprendre
-                            </button>
-                            <button
-                                onClick={handleValidate}
-                                className="flex-1 bg-green-500 hover:bg-green-600 text-white font-semibold py-2.5 rounded-xl transition-all text-sm"
-                            >
-                                Valider
-                            </button>
-                        </>
-                    )}
-                    {(mode === 'streaming' || error) && (
-                        <button
-                            onClick={onClose}
-                            className={`${error ? 'flex-1' : ''} bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 px-4 rounded-xl transition-all text-sm`}
-                        >
-                            Fermer
-                        </button>
-                    )}
+                    <button
+                        onClick={handleValidate}
+                        disabled={capturedPhotos.length === 0}
+                        className={`flex-1 h-[60px] rounded-[16px] font-bold text-[16px] transition-all ${
+                            capturedPhotos.length > 0
+                                ? 'bg-[#2E7D32] text-white active:bg-[#1B5E20]'
+                                : 'bg-[#E0E0E0] text-[#999] cursor-not-allowed'
+                        }`}
+                    >
+                        Valider{capturedPhotos.length > 0 ? ` (${capturedPhotos.length})` : ''}
+                    </button>
+                    <button
+                        onClick={onClose}
+                        className={`${error ? 'flex-1' : ''} h-[60px] bg-white text-[#111] border border-[#E0E0E0] rounded-[16px] font-semibold text-[16px] px-5 active:bg-gray-50 transition-all`}
+                    >
+                        Fermer
+                    </button>
                 </div>
             </div>
         </div>
