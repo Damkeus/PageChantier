@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { type TranslationKey } from './i18n';
 
 // =============================================
 // TYPES
@@ -39,6 +40,7 @@ export interface Point5MinNotificationProps {
     projectTitle: string;
     onOpen: () => void;
     onDismiss: () => void;
+    t: (key: TranslationKey) => string;
 }
 
 export interface Point5MinPanelProps {
@@ -46,6 +48,7 @@ export interface Point5MinPanelProps {
     projectTitle: string;
     onClose: () => void;
     onSubmit: (data: Point5MinData) => void;
+    t: (key: TranslationKey) => string;
 }
 
 // =============================================
@@ -57,6 +60,7 @@ interface VoiceFieldProps {
     placeholder: string;
     value: string;
     onChange: (v: string) => void;
+    t: (key: TranslationKey) => string;
 }
 
 const speechAvailableOnce = typeof window !== 'undefined' && !!(
@@ -64,7 +68,7 @@ const speechAvailableOnce = typeof window !== 'undefined' && !!(
     (window as unknown as Record<string, unknown>).webkitSpeechRecognition
 );
 
-const VoiceField: React.FC<VoiceFieldProps> = ({ label, placeholder, value, onChange }) => {
+const VoiceField: React.FC<VoiceFieldProps> = ({ label, placeholder, value, onChange, t }) => {
     const [isRecording, setIsRecording] = useState(false);
     const recognitionRef = useRef<unknown>(null);
 
@@ -117,7 +121,7 @@ const VoiceField: React.FC<VoiceFieldProps> = ({ label, placeholder, value, onCh
                     type="button"
                     onClick={toggleRecording}
                     disabled={!speechAvailableOnce}
-                    title={speechAvailableOnce ? (isRecording ? 'Arrêter la dictée' : 'Dicter') : 'Non disponible sur cet appareil'}
+                    title={speechAvailableOnce ? (isRecording ? t('stop_dictation') : t('dictate')) : t('not_available')}
                     className={`absolute bottom-3 right-3 p-2 rounded-full transition-all ${
                         !speechAvailableOnce
                             ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
@@ -142,7 +146,7 @@ const VoiceField: React.FC<VoiceFieldProps> = ({ label, placeholder, value, onCh
 // NOTIFICATION BANNER (swipe-to-dismiss)
 // =============================================
 
-export const Point5MinNotification: React.FC<Point5MinNotificationProps> = ({ onOpen, onDismiss }) => {
+export const Point5MinNotification: React.FC<Point5MinNotificationProps> = ({ onOpen, onDismiss, t }) => {
     const [swipeY, setSwipeY] = useState(0);
     const startYRef = useRef(0);
 
@@ -187,8 +191,8 @@ export const Point5MinNotification: React.FC<Point5MinNotificationProps> = ({ on
                 </div>
 
                 <div className="flex-1 min-w-0">
-                    <div className="text-[14px] font-bold text-[#111]">Point 5 min</div>
-                    <div className="text-[12px] text-[#888]">Briefing quotidien non effectué</div>
+                    <div className="text-[14px] font-bold text-[#111]">{t('point5min_title')}</div>
+                    <div className="text-[12px] text-[#888]">{t('daily_not_done')}</div>
                 </div>
 
                 <button
@@ -205,7 +209,7 @@ export const Point5MinNotification: React.FC<Point5MinNotificationProps> = ({ on
                 onClick={onOpen}
                 className="w-full bg-[#C41230] hover:bg-[#a80f28] active:opacity-90 text-white text-[14px] font-semibold py-3 transition-all"
             >
-                Commencer le Point 5 min →
+                {t('start_briefing')}
             </button>
         </div>
     );
@@ -216,15 +220,6 @@ export const Point5MinNotification: React.FC<Point5MinNotificationProps> = ({ on
 // =============================================
 
 type WizardStep = 0 | 1 | 2 | 3 | 4 | 5;
-
-const STEP_TITLES: Record<number, string> = {
-    0: 'Contexte du chantier',
-    1: 'Objectif Journalier',
-    2: 'Risques Associés',
-    3: 'Objectif Retardé',
-    4: 'Point Supplémentaire',
-    5: 'Résumé',
-};
 
 const STEP_COLORS: Record<number, string> = {
     0: '#C41230',
@@ -242,6 +237,7 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
     projectTitle,
     onClose,
     onSubmit,
+    t,
 }) => {
     const [step, setStep] = useState<WizardStep>(0);
     const today = new Date().toISOString().split('T')[0];
@@ -254,6 +250,15 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
     const [risquesAssocies, setRisquesAssocies] = useState('');
     const [objectifRetarde, setObjectifRetarde] = useState('');
     const [pointSupplementaire, setPointSupplementaire] = useState('');
+
+    const stepTitles: Record<number, string> = {
+        0: t('step_context'),
+        1: t('step_daily_goal'),
+        2: t('step_risks'),
+        3: t('step_delayed'),
+        4: t('step_extra'),
+        5: t('step_summary'),
+    };
 
     const resetState = () => {
         setStep(0);
@@ -326,10 +331,12 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
                     </button>
                     <div className="flex-1 min-w-0">
                         <div className="text-[11px] font-semibold uppercase tracking-[1.5px] text-white/70">
-                            {step < TOTAL_STEPS ? `Point 5 min — Étape ${step + 1} / ${TOTAL_STEPS}` : 'Point 5 min — Récapitulatif'}
+                            {step < TOTAL_STEPS
+                                ? `${t('briefing_step')} ${step + 1} / ${TOTAL_STEPS}`
+                                : t('briefing_recap')}
                         </div>
                         <div className="text-[18px] font-bold text-white leading-tight truncate">
-                            {STEP_TITLES[step]}
+                            {stepTitles[step]}
                         </div>
                     </div>
                 </div>
@@ -347,30 +354,33 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
                     {step === 0 && (
                         <>
                             <VoiceField
-                                label="Qui fait le point ? *"
-                                placeholder="Votre nom et prénom..."
+                                label={t('who_briefing')}
+                                placeholder={t('your_name_placeholder')}
                                 value={userChantier}
                                 onChange={setUserChantier}
+                                t={t}
                             />
                             <VoiceField
-                                label="Travaux en cours"
-                                placeholder="Décrire les travaux du jour..."
+                                label={t('current_work')}
+                                placeholder={t('describe_work_placeholder')}
                                 value={travauxPresent}
                                 onChange={setTravauxPresent}
+                                t={t}
                             />
                             <VoiceField
-                                label="Monteurs présents"
-                                placeholder="Noms des monteurs présents..."
+                                label={t('workers_present')}
+                                placeholder={t('workers_names_placeholder')}
                                 value={monteursPresent}
                                 onChange={setMonteursPresent}
+                                t={t}
                             />
                             <div className="grid grid-cols-2 gap-2 pt-1">
                                 <div className="bg-[#F4F4F6] rounded-xl px-3 py-2">
-                                    <div className="text-[10px] text-[#999] font-semibold uppercase tracking-wider mb-0.5">Chantier</div>
+                                    <div className="text-[10px] text-[#999] font-semibold uppercase tracking-wider mb-0.5">{t('site')}</div>
                                     <div className="text-[13px] font-semibold text-[#333] truncate">{projectTitle}</div>
                                 </div>
                                 <div className="bg-[#F4F4F6] rounded-xl px-3 py-2">
-                                    <div className="text-[10px] text-[#999] font-semibold uppercase tracking-wider mb-0.5">Date</div>
+                                    <div className="text-[10px] text-[#999] font-semibold uppercase tracking-wider mb-0.5">{t('date')}</div>
                                     <div className="text-[13px] font-semibold text-[#333]">{today}</div>
                                 </div>
                             </div>
@@ -379,52 +389,56 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
 
                     {step === 1 && (
                         <VoiceField
-                            label="Objectif Journalier *"
-                            placeholder="Quels sont les objectifs à atteindre aujourd'hui ?"
+                            label={t('daily_goal_label')}
+                            placeholder={t('daily_goal_placeholder')}
                             value={objectifJournalier}
                             onChange={setObjectifJournalier}
+                            t={t}
                         />
                     )}
 
                     {step === 2 && (
                         <VoiceField
-                            label="Risques Associés *"
-                            placeholder="Quels sont les risques liés aux travaux du jour ?"
+                            label={t('risks_label')}
+                            placeholder={t('risks_placeholder')}
                             value={risquesAssocies}
                             onChange={setRisquesAssocies}
+                            t={t}
                         />
                     )}
 
                     {step === 3 && (
                         <VoiceField
-                            label="Objectif Retardé *"
-                            placeholder="Y a-t-il des objectifs en retard ? Causes et actions correctives..."
+                            label={t('delayed_label')}
+                            placeholder={t('delayed_placeholder')}
                             value={objectifRetarde}
                             onChange={setObjectifRetarde}
+                            t={t}
                         />
                     )}
 
                     {step === 4 && (
                         <VoiceField
-                            label="Point Supplémentaire *"
-                            placeholder="Tout autre point à aborder avec l'équipe..."
+                            label={t('extra_label')}
+                            placeholder={t('extra_placeholder')}
                             value={pointSupplementaire}
                             onChange={setPointSupplementaire}
+                            t={t}
                         />
                     )}
 
                     {step === 5 && (
                         <div className="space-y-2">
                             {([
-                                { label: 'Responsable', value: userChantier },
-                                { label: 'Chantier', value: projectTitle },
-                                { label: 'Date', value: today },
-                                { label: 'Travaux', value: travauxPresent || '—' },
-                                { label: 'Monteurs', value: monteursPresent || '—' },
-                                { label: 'Objectif Journalier', value: objectifJournalier },
-                                { label: 'Risques Associés', value: risquesAssocies },
-                                { label: 'Objectif Retardé', value: objectifRetarde },
-                                { label: 'Point Supplémentaire', value: pointSupplementaire },
+                                { label: t('responsible'), value: userChantier },
+                                { label: t('site'), value: projectTitle },
+                                { label: t('date'), value: today },
+                                { label: t('current_work'), value: travauxPresent || '—' },
+                                { label: t('workers_present'), value: monteursPresent || '—' },
+                                { label: t('step_daily_goal'), value: objectifJournalier },
+                                { label: t('step_risks'), value: risquesAssocies },
+                                { label: t('step_delayed'), value: objectifRetarde },
+                                { label: t('step_extra'), value: pointSupplementaire },
                             ] as { label: string; value: string }[]).map(({ label, value }) => (
                                 <div key={label} className="border border-gray-100 rounded-xl p-3">
                                     <div className="text-[10px] font-bold uppercase tracking-wider text-[#999] mb-1">{label}</div>
@@ -442,7 +456,7 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
                             onClick={() => setStep((s) => (s - 1) as WizardStep)}
                             className="flex-1 h-12 rounded-[14px] bg-gray-100 text-[#333] text-[14px] font-semibold active:bg-gray-200 transition-all"
                         >
-                            Précédent
+                            {t('prev')}
                         </button>
                     )}
                     {step < TOTAL_STEPS ? (
@@ -452,14 +466,14 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
                             style={{ backgroundColor: canProceed() ? stepColor : undefined }}
                             className="flex-1 h-12 rounded-[14px] disabled:bg-gray-200 disabled:text-gray-400 text-white text-[14px] font-semibold active:opacity-90 transition-all"
                         >
-                            {step === 4 ? 'Récapitulatif' : 'Suivant'}
+                            {step === 4 ? t('recap_btn') : t('next')}
                         </button>
                     ) : (
                         <button
                             onClick={handleValidate}
                             className="flex-1 h-12 rounded-[14px] bg-[#C41230] hover:bg-[#a80f28] text-white text-[14px] font-semibold active:opacity-90 transition-all"
                         >
-                            Valider le Point 5 min
+                            {t('validate_briefing')}
                         </button>
                     )}
                 </div>

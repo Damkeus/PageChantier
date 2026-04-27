@@ -4,6 +4,7 @@ import { SchemaView } from './SchemaComponents';
 import type { SchemaElement, SchemaData } from './SchemaComponents';
 import { Point5MinNotification, Point5MinPanel } from './Point5MinPanel';
 import type { Point5MinData } from './Point5MinPanel';
+import { type Lang, type TranslationKey, t, photosTakenLabel, getLangFromProp, LANG_CYCLE } from './i18n';
 
 // =============================================
 // TYPES
@@ -20,6 +21,7 @@ interface ProjectData {
     Title: string;
     AddressChantier: string;
     PM: string;
+    PMPhone?: string;
     ProjectUniqID?: string;
     ProjectPath?: string;
     folderpath?: string;
@@ -33,6 +35,7 @@ interface ProjectData {
 interface AppProps {
     projectJSON?: string;
     jsonSchema?: string;
+    language?: string;
     onOutputChange?: (key: string, value: string | boolean) => void;
 }
 
@@ -62,7 +65,7 @@ interface SpeechRecognitionInstance {
 // MAIN APP
 // =============================================
 
-const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) => {
+const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, onOutputChange }) => {
     const [isContactModalOpen, setIsContactModalOpen] = useState(false);
     const [isRapportOpen, setIsRapportOpen] = useState(false);
     const [currentView, setCurrentView] = useState<ViewType>('menu');
@@ -70,6 +73,21 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
     const [isPhotoOpen, setIsPhotoOpen] = useState(false);
     const [isPoint5MinOpen, setIsPoint5MinOpen] = useState(false);
     const [showPoint5MinBanner, setShowPoint5MinBanner] = useState(false);
+
+    const [lang, setLang] = useState<Lang>(() => getLangFromProp(language));
+
+    useEffect(() => {
+        setLang(getLangFromProp(language));
+    }, [language]);
+
+    const toggleLang = () => {
+        setLang(prev => {
+            const idx = LANG_CYCLE.indexOf(prev);
+            return LANG_CYCLE[(idx + 1) % LANG_CYCLE.length];
+        });
+    };
+
+    const tr = (key: TranslationKey) => t(key, lang);
 
     const [breakpoint, setBreakpoint] = useState<Breakpoint>('mobile');
     const [containerRef, setContainerRef] = useState<HTMLDivElement | null>(null);
@@ -163,7 +181,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
     if (!project) {
         return (
             <div style={{ fontFamily: "'DM Sans', sans-serif" }} className="flex items-center justify-center h-full w-full bg-[#F4F4F6] text-gray-400 text-sm">
-                Aucun projet sélectionné.
+                {tr('no_project')}
             </div>
         );
     }
@@ -193,8 +211,17 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                 >
                     {/* ── Red Header ── */}
                     <div className="bg-[#C41230] px-6 pt-5 pb-6 text-white flex-shrink-0">
-                        <div className="text-[11px] font-semibold uppercase tracking-[1.5px] opacity-70 mb-1">
-                            Chantier en cours
+                        <div className="flex items-center justify-between mb-1">
+                            <div className="text-[11px] font-semibold uppercase tracking-[1.5px] opacity-70">
+                                {tr('site_in_progress')}
+                            </div>
+                            <button
+                                onClick={toggleLang}
+                                className="text-[11px] font-bold uppercase tracking-[1px] bg-white/20 hover:bg-white/30 active:bg-white/40 rounded-full px-[10px] py-[3px] transition-all border border-white/30"
+                                aria-label="Switch language"
+                            >
+                                {lang.toUpperCase()}
+                            </button>
                         </div>
                         <div className="text-[28px] font-bold tracking-[-0.5px] mb-4 leading-tight">
                             {project.Title}
@@ -207,8 +234,17 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <div className="text-[14px] font-semibold truncate">{project.PM}</div>
-                                    <div className="text-[12px] opacity-70 mt-[1px]">Chef de projet</div>
+                                    <div className="text-[12px] opacity-70 mt-[1px]">{tr('project_manager')}</div>
                                 </div>
+                                {project.PMPhone && (
+                                    <a
+                                        href={`tel:${project.PMPhone}`}
+                                        className="w-9 h-9 rounded-full bg-white/25 flex items-center justify-center active:bg-white/40 transition-all flex-shrink-0"
+                                        aria-label={tr('call_pm')}
+                                    >
+                                        <Phone className="w-4 h-4 text-white" />
+                                    </a>
+                                )}
                             </div>
                         )}
 
@@ -218,14 +254,14 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                                 className="flex-1 h-12 rounded-[14px] border-2 border-white/35 bg-white/10 text-white text-[14px] font-semibold flex items-center justify-center gap-[6px] active:bg-white/25 transition-all"
                             >
                                 <Phone className="w-4 h-4" />
-                                Contacts
+                                {tr('contacts')}
                             </button>
                             <button
                                 onClick={handleOpenGPS}
                                 className="flex-1 h-12 rounded-[14px] border-2 border-white/35 bg-white/10 text-white text-[14px] font-semibold flex items-center justify-center gap-[6px] active:bg-white/25 transition-all"
                             >
                                 <Navigation className="w-4 h-4" />
-                                Itinéraire
+                                {tr('directions')}
                             </button>
                         </div>
                     </div>
@@ -240,7 +276,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
 
                     {/* ── Vue principale ── */}
                     <div className="text-[11px] font-bold uppercase tracking-[1.5px] text-[#999] px-6 pt-5 pb-[10px] flex-shrink-0">
-                        Vue principale
+                        {tr('main_view')}
                     </div>
 
                     <div className="mx-4 bg-white rounded-[20px] overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.07)] flex-shrink-0">
@@ -253,13 +289,13 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="text-[11px] font-semibold uppercase tracking-[1px] text-[#999] mb-[3px]">
-                                    Schéma
+                                    {tr('diagram_label')}
                                 </div>
                                 <div className="text-[17px] font-bold text-[#111] leading-tight">
-                                    Schéma Unifilaire
+                                    {tr('single_line_diagram')}
                                 </div>
                                 <div className="text-[13px] text-[#888] mt-[2px]">
-                                    {hasSchema ? 'Visualiser le schéma du chantier' : 'Aucun schéma disponible'}
+                                    {hasSchema ? tr('view_diagram') : tr('no_diagram')}
                                 </div>
                             </div>
                             <svg className="w-[18px] h-[18px] text-[#C41230] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
@@ -270,7 +306,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
 
                     {/* ── Actions rapides ── */}
                     <div className="text-[11px] font-bold uppercase tracking-[1.5px] text-[#999] px-6 pt-5 pb-[10px] flex-shrink-0">
-                        Actions rapides
+                        {tr('quick_actions')}
                     </div>
 
                     <div className="grid grid-cols-3 gap-3 px-4 pb-6 flex-shrink-0">
@@ -288,7 +324,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                             <div className="w-[52px] h-[52px] rounded-[16px] bg-[#FEE8EC] flex items-center justify-center">
                                 <FileText className="w-6 h-6 text-[#C41230]" />
                             </div>
-                            <span className="text-[13px] font-semibold text-[#222] text-center leading-tight">Documents</span>
+                            <span className="text-[13px] font-semibold text-[#222] text-center leading-tight">{tr('documents')}</span>
                         </button>
 
                         <button
@@ -298,7 +334,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                             <div className="w-[52px] h-[52px] rounded-[16px] bg-[#FEE8EC] flex items-center justify-center">
                                 <ClipboardEdit className="w-6 h-6 text-[#C41230]" />
                             </div>
-                            <span className="text-[13px] font-semibold text-[#222] text-center leading-tight">Rapport</span>
+                            <span className="text-[13px] font-semibold text-[#222] text-center leading-tight">{tr('report_btn')}</span>
                         </button>
 
                         <button
@@ -308,7 +344,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                             <div className="w-[52px] h-[52px] rounded-[16px] bg-[#FEE8EC] flex items-center justify-center">
                                 <Camera className="w-6 h-6 text-[#C41230]" />
                             </div>
-                            <span className="text-[13px] font-semibold text-[#222] text-center leading-tight">Photo</span>
+                            <span className="text-[13px] font-semibold text-[#222] text-center leading-tight">{tr('photo_btn')}</span>
                         </button>
                     </div>
 
@@ -318,6 +354,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                             projectTitle={projectTitle}
                             onOpen={() => setIsPoint5MinOpen(true)}
                             onDismiss={() => setShowPoint5MinBanner(false)}
+                            t={tr}
                         />
                     )}
                 </div>
@@ -328,6 +365,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                 isOpen={isContactModalOpen}
                 onClose={() => setIsContactModalOpen(false)}
                 contacts={contacts}
+                t={tr}
             />
 
             {/* Rapport Panel */}
@@ -340,6 +378,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                         onOutputChange('RapportTimestamp', new Date().toISOString());
                     }
                 }}
+                t={tr}
             />
 
             {/* Photo Panel */}
@@ -354,6 +393,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                         onOutputChange('PhotoTrigger', true);
                     }
                 }}
+                t={tr}
             />
 
             {/* Point 5 min Panel */}
@@ -362,6 +402,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, onOutputChange }) =>
                 projectTitle={projectTitle}
                 onClose={() => setIsPoint5MinOpen(false)}
                 onSubmit={handlePoint5MinSubmit}
+                t={tr}
             />
         </>
     );
@@ -375,9 +416,10 @@ interface ContactModalProps {
     isOpen: boolean;
     onClose: () => void;
     contacts: ContactData[];
+    t: (key: TranslationKey) => string;
 }
 
-const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, contacts }) => {
+const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, contacts, t }) => {
     if (!isOpen) return null;
 
     return (
@@ -396,8 +438,8 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, contacts }
 
                 <div className="flex items-center justify-between px-4 pt-3 pb-2">
                     <div>
-                        <h2 className="text-base font-bold text-gray-900">Contacts Chantier</h2>
-                        <p className="text-xs text-gray-400">Coordonnées des contacts</p>
+                        <h2 className="text-base font-bold text-gray-900">{t('site_contacts')}</h2>
+                        <p className="text-xs text-gray-400">{t('contact_details')}</p>
                     </div>
                     <button
                         onClick={onClose}
@@ -411,7 +453,7 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, contacts }
 
                 <div className="p-4 space-y-3 max-h-64 overflow-y-auto">
                     {contacts.length === 0 && (
-                        <p className="text-xs text-gray-400 italic">Aucune information de contact</p>
+                        <p className="text-xs text-gray-400 italic">{t('no_contact_info')}</p>
                     )}
                     {contacts.map((c, i) => (
                         <div key={i} className="rounded-xl border border-gray-100 p-3 space-y-2">
@@ -454,7 +496,7 @@ const ContactModal: React.FC<ContactModalProps> = ({ isOpen, onClose, contacts }
                         onClick={onClose}
                         className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl transition-all text-sm"
                     >
-                        Fermer
+                        {t('close')}
                     </button>
                 </div>
             </div>
@@ -470,9 +512,10 @@ interface RapportPanelProps {
     isOpen: boolean;
     onClose: () => void;
     onSubmit: (text: string) => void;
+    t: (key: TranslationKey) => string;
 }
 
-const RapportPanel: React.FC<RapportPanelProps> = ({ isOpen, onClose, onSubmit }) => {
+const RapportPanel: React.FC<RapportPanelProps> = ({ isOpen, onClose, onSubmit, t }) => {
     const [text, setText] = useState('');
     const [isRecording, setIsRecording] = useState(false);
     const [speechAvailable] = useState(() =>
@@ -543,8 +586,8 @@ const RapportPanel: React.FC<RapportPanelProps> = ({ isOpen, onClose, onSubmit }
 
                 <div className="flex items-center justify-between px-4 pt-3 pb-2">
                     <div>
-                        <h2 className="text-base font-bold text-gray-900">Rapport de chantier</h2>
-                        <p className="text-xs text-gray-400">Saisie texte ou dictée vocale</p>
+                        <h2 className="text-base font-bold text-gray-900">{t('site_report_title')}</h2>
+                        <p className="text-xs text-gray-400">{t('text_or_voice')}</p>
                     </div>
                     <button
                         onClick={onClose}
@@ -561,13 +604,13 @@ const RapportPanel: React.FC<RapportPanelProps> = ({ isOpen, onClose, onSubmit }
                         <textarea
                             value={text}
                             onChange={(e) => setText(e.target.value)}
-                            placeholder="Décrivez l'avancement du chantier..."
+                            placeholder={t('report_placeholder')}
                             className="w-full min-h-[120px] border border-gray-200 rounded-xl p-3 pr-12 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-nexans/30 focus:border-nexans"
                         />
                         <button
                             onClick={toggleRecording}
                             disabled={!speechAvailable}
-                            title={speechAvailable ? (isRecording ? 'Arrêter la dictée' : 'Dicter') : 'Non disponible sur cet appareil'}
+                            title={speechAvailable ? (isRecording ? t('stop_dictation') : t('dictate')) : t('not_available')}
                             className={`absolute bottom-3 right-3 p-2 rounded-full transition-all ${!speechAvailable ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : ''
                                 }${speechAvailable && !isRecording ? ' bg-nexans/10 text-nexans hover:bg-nexans/20' : ''
                                 }${isRecording ? ' bg-nexans text-white animate-pulse-ring' : ''}`}
@@ -581,7 +624,7 @@ const RapportPanel: React.FC<RapportPanelProps> = ({ isOpen, onClose, onSubmit }
                         disabled={!text.trim()}
                         className="w-full bg-nexans hover:bg-nexans-dark disabled:bg-gray-200 disabled:text-gray-400 text-white font-semibold py-2.5 rounded-xl transition-all text-sm"
                     >
-                        Envoyer
+                        {t('send')}
                     </button>
                 </div>
             </div>
@@ -597,9 +640,10 @@ interface PhotoPanelProps {
     isOpen: boolean;
     onClose: () => void;
     onPhotoCapture: (base64: string) => void;
+    t: (key: TranslationKey) => string;
 }
 
-const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture }) => {
+const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture, t }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -627,9 +671,9 @@ const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture
         } catch (err) {
             const message = err instanceof Error ? err.message : 'Erreur inconnue';
             if (message.includes('Permission') || message.includes('NotAllowed')) {
-                setError('Permission caméra refusée. Veuillez autoriser l\'accès.');
+                setError(t('camera_denied'));
             } else {
-                setError('Impossible d\'accéder à la caméra : ' + message);
+                setError(t('camera_error') + message);
             }
         }
     }, []);
@@ -696,9 +740,11 @@ const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture
                         </svg>
                     </button>
                     <div>
-                        <h2 className="text-[18px] font-bold text-white leading-tight">Photos Chantier</h2>
+                        <h2 className="text-[18px] font-bold text-white leading-tight">{t('site_photos_title')}</h2>
                         <p className="text-[12px] text-white/70">
-                            {capturedPhotos.length > 0 ? `${capturedPhotos.length} photo${capturedPhotos.length > 1 ? 's' : ''} prise${capturedPhotos.length > 1 ? 's' : ''}` : 'Capture photo du chantier'}
+                            {capturedPhotos.length > 0
+                                ? (capturedPhotos.length === 1 ? t('photos_taken_one') : t('photos_taken_many').replace('{n}', String(capturedPhotos.length)))
+                                : t('photo_capture_subtitle')}
                         </p>
                     </div>
                 </div>
@@ -754,7 +800,7 @@ const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture
                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                                                     <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
                                                 </svg>
-                                                Supprimer
+                                                {t('delete')}
                                             </button>
                                         </div>
                                     </div>
@@ -792,7 +838,7 @@ const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture
                             className="flex-[2] h-[60px] bg-[#C41230] text-white rounded-[16px] font-bold text-[16px] flex items-center justify-center gap-2 active:bg-[#a00f28] transition-all"
                         >
                             <Camera className="w-5 h-5" />
-                            Capturer
+                            {t('capture')}
                         </button>
                     )}
                     <button
@@ -804,13 +850,13 @@ const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture
                                 : 'bg-[#E0E0E0] text-[#999] cursor-not-allowed'
                         }`}
                     >
-                        Valider{capturedPhotos.length > 0 ? ` (${capturedPhotos.length})` : ''}
+                        {t('validate')}{capturedPhotos.length > 0 ? ` (${capturedPhotos.length})` : ''}
                     </button>
                     <button
                         onClick={onClose}
                         className={`${error ? 'flex-1' : ''} h-[60px] bg-white text-[#111] border border-[#E0E0E0] rounded-[16px] font-semibold text-[16px] px-5 active:bg-gray-50 transition-all`}
                     >
-                        Fermer
+                        {t('close')}
                     </button>
                 </div>
             </div>
