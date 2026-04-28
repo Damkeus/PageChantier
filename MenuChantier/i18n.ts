@@ -72,6 +72,11 @@ const translations = {
     recap_btn: 'Récapitulatif',
     next: 'Suivant',
     validate_briefing: 'Valider le Point 5 min',
+    no_workers_defined: 'Aucun monteur défini pour ce projet',
+    pm_notification_title: 'Message du chef de projet',
+    pm_notif_type_new_doc: 'Nouveau document',
+    pm_notif_type_assembly: 'Indication de montage',
+    pm_notif_type_general: 'Information générale',
   },
   en: {
     no_project: 'No project selected.',
@@ -142,6 +147,11 @@ const translations = {
     recap_btn: 'Summary',
     next: 'Next',
     validate_briefing: 'Validate 5-min briefing',
+    no_workers_defined: 'No workers defined for this project',
+    pm_notification_title: 'Project manager message',
+    pm_notif_type_new_doc: 'New document',
+    pm_notif_type_assembly: 'Assembly instruction',
+    pm_notif_type_general: 'General information',
   },
   no: {
     no_project: 'Ingen prosjekt valgt.',
@@ -212,6 +222,11 @@ const translations = {
     recap_btn: 'Sammendrag',
     next: 'Neste',
     validate_briefing: 'Bekreft 5-min briefing',
+    no_workers_defined: 'Ingen montører definert for dette prosjektet',
+    pm_notification_title: 'Melding fra prosjektleder',
+    pm_notif_type_new_doc: 'Nytt dokument',
+    pm_notif_type_assembly: 'Monteringsanvisning',
+    pm_notif_type_general: 'Generell informasjon',
   },
 } as const;
 

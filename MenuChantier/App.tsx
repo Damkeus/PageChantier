@@ -3,6 +3,8 @@ import { MapPin, FileText, Activity, ClipboardEdit, Navigation, Camera, Phone, X
 import { SchemaView } from './SchemaComponents';
 import type { SchemaElement, SchemaData } from './SchemaComponents';
 import { Point5MinNotification, Point5MinPanel } from './Point5MinPanel';
+import { PMNotificationBanner, PMNotificationPanel } from './PMNotificationPanel';
+import type { PMNotification } from './PMNotificationPanel';
 import type { Point5MinData } from './Point5MinPanel';
 import { type Lang, type TranslationKey, t, photosTakenLabel, getLangFromProp, LANG_CYCLE } from './i18n';
 
@@ -30,6 +32,8 @@ interface ProjectData {
     Contact?: ContactData[] | string | null;
     SchemaFolderPath?: string;
     ordreSchema?: string;
+    Monteurs?: { Name: string }[];
+    PMNotification?: PMNotification;
 }
 
 interface AppProps {
@@ -72,7 +76,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, onOutputCh
     const [selectedElement, setSelectedElement] = useState<SchemaElement | null>(null);
     const [isPhotoOpen, setIsPhotoOpen] = useState(false);
     const [isPoint5MinOpen, setIsPoint5MinOpen] = useState(false);
-    const [showPoint5MinBanner, setShowPoint5MinBanner] = useState(false);
+    const [isPMNotifOpen, setIsPMNotifOpen] = useState(false);
 
     const [lang, setLang] = useState<Lang>(() => getLangFromProp(language));
 
@@ -115,15 +119,6 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, onOutputCh
 
     const projectTitle = project?.Title ?? '';
 
-    useEffect(() => {
-        if (!projectTitle) return;
-        const today = new Date().toISOString().split('T')[0];
-        const key = `p5m_done_${encodeURIComponent(projectTitle)}_${today}`;
-        if (!localStorage.getItem(key)) {
-            setShowPoint5MinBanner(true);
-        }
-    }, [projectTitle]);
-
     const contacts = useMemo((): ContactData[] => {
         if (!project?.Contact) return [];
         if (Array.isArray(project.Contact)) return project.Contact;
@@ -138,6 +133,13 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, onOutputCh
             }
         }
         return [];
+    }, [project]);
+
+    const monteurs = useMemo((): string[] => {
+        if (!project?.Monteurs) return [];
+        return project.Monteurs
+            .map((m) => m.Name?.trim())
+            .filter((name): name is string => !!name);
     }, [project]);
 
     const schemaData = useMemo((): SchemaData | null => {
@@ -170,13 +172,16 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, onOutputCh
         const today = new Date().toISOString().split('T')[0];
         const key = `p5m_done_${encodeURIComponent(projectTitle)}_${today}`;
         localStorage.setItem(key, '1');
-        setShowPoint5MinBanner(false);
         setIsPoint5MinOpen(false);
         if (onOutputChange) {
             onOutputChange('Point5MinJSON', JSON.stringify(data));
             onOutputChange('Point5MinTimestamp', new Date().toISOString());
         }
     };
+
+    const point5MinDoneToday = !!projectTitle && !!localStorage.getItem(
+        `p5m_done_${encodeURIComponent(projectTitle)}_${new Date().toISOString().split('T')[0]}`
+    );
 
     if (!project) {
         return (
@@ -348,12 +353,22 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, onOutputCh
                         </button>
                     </div>
 
+                    {/* ── PM Notification ── */}
+                    {project.PMNotification && !isPMNotifOpen && (
+                        <div className="px-4">
+                            <PMNotificationBanner
+                                notification={project.PMNotification}
+                                lang={lang}
+                                onOpen={() => setIsPMNotifOpen(true)}
+                            />
+                        </div>
+                    )}
+
                     {/* ── Point 5 min daily notification ── */}
-                    {showPoint5MinBanner && !isPoint5MinOpen && (
+                    {!point5MinDoneToday && !isPoint5MinOpen && (
                         <Point5MinNotification
                             projectTitle={projectTitle}
                             onOpen={() => setIsPoint5MinOpen(true)}
-                            onDismiss={() => setShowPoint5MinBanner(false)}
                             t={tr}
                         />
                     )}
@@ -400,10 +415,21 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, onOutputCh
             <Point5MinPanel
                 isOpen={isPoint5MinOpen}
                 projectTitle={projectTitle}
+                monteurs={monteurs}
                 onClose={() => setIsPoint5MinOpen(false)}
                 onSubmit={handlePoint5MinSubmit}
                 t={tr}
             />
+
+            {/* PM Notification Panel */}
+            {project.PMNotification && (
+                <PMNotificationPanel
+                    notification={project.PMNotification}
+                    lang={lang}
+                    isOpen={isPMNotifOpen}
+                    onClose={() => setIsPMNotifOpen(false)}
+                />
+            )}
         </>
     );
 };
