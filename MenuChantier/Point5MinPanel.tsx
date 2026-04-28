@@ -39,13 +39,13 @@ interface SpeechRecognitionInstance {
 export interface Point5MinNotificationProps {
     projectTitle: string;
     onOpen: () => void;
-    onDismiss: () => void;
     t: (key: TranslationKey) => string;
 }
 
 export interface Point5MinPanelProps {
     isOpen: boolean;
     projectTitle: string;
+    monteurs: string[];
     onClose: () => void;
     onSubmit: (data: Point5MinData) => void;
     t: (key: TranslationKey) => string;
@@ -146,65 +146,24 @@ const VoiceField: React.FC<VoiceFieldProps> = ({ label, placeholder, value, onCh
 // NOTIFICATION BANNER (swipe-to-dismiss)
 // =============================================
 
-export const Point5MinNotification: React.FC<Point5MinNotificationProps> = ({ onOpen, onDismiss, t }) => {
-    const [swipeY, setSwipeY] = useState(0);
-    const startYRef = useRef(0);
-
-    const handleTouchStart = (e: React.TouchEvent) => {
-        startYRef.current = e.touches[0].clientY;
-    };
-
-    const handleTouchMove = (e: React.TouchEvent) => {
-        const delta = e.touches[0].clientY - startYRef.current;
-        if (delta > 0) setSwipeY(delta);
-    };
-
-    const handleTouchEnd = () => {
-        if (swipeY > 80) {
-            onDismiss();
-        }
-        setSwipeY(0);
-    };
-
+export const Point5MinNotification: React.FC<Point5MinNotificationProps> = ({ onOpen, t }) => {
     return (
         <div
-            style={{
-                fontFamily: "'DM Sans', sans-serif",
-                transform: `translateY(${swipeY}px)`,
-                transition: swipeY === 0 ? 'transform 0.3s ease' : 'none',
-            }}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
             className="mx-4 mb-4 bg-white rounded-[20px] shadow-[0_2px_16px_rgba(196,18,48,0.15)] border border-[#FEE8EC] overflow-hidden flex-shrink-0"
         >
-            <div className="flex justify-center pt-2 pb-1">
-                <div className="w-8 h-1 bg-gray-200 rounded-full" />
-            </div>
-
-            <div className="flex items-center gap-3 px-4 pb-4">
+            <div className="flex items-center gap-3 px-4 py-4">
                 <div className="w-11 h-11 rounded-[14px] bg-[#FEE8EC] flex items-center justify-center flex-shrink-0">
                     <svg className="w-5 h-5 text-[#C41230]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10" />
                         <polyline points="12 6 12 12 16 14" />
                     </svg>
                 </div>
-
                 <div className="flex-1 min-w-0">
                     <div className="text-[14px] font-bold text-[#111]">{t('point5min_title')}</div>
                     <div className="text-[12px] text-[#888]">{t('daily_not_done')}</div>
                 </div>
-
-                <button
-                    onClick={onDismiss}
-                    className="p-1.5 rounded-full hover:bg-gray-100 transition-colors flex-shrink-0"
-                >
-                    <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
             </div>
-
             <button
                 onClick={onOpen}
                 className="w-full bg-[#C41230] hover:bg-[#a80f28] active:opacity-90 text-white text-[14px] font-semibold py-3 transition-all"
@@ -235,6 +194,7 @@ const TOTAL_STEPS = 5;
 export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
     isOpen,
     projectTitle,
+    monteurs,
     onClose,
     onSubmit,
     t,
@@ -244,7 +204,7 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
 
     const [userChantier, setUserChantier] = useState('');
     const [travauxPresent, setTravauxPresent] = useState('');
-    const [monteursPresent, setMonteursPresent] = useState('');
+    const [selectedMonteurs, setSelectedMonteurs] = useState<Set<string>>(new Set());
 
     const [objectifJournalier, setObjectifJournalier] = useState('');
     const [risquesAssocies, setRisquesAssocies] = useState('');
@@ -264,7 +224,7 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
         setStep(0);
         setUserChantier('');
         setTravauxPresent('');
-        setMonteursPresent('');
+        setSelectedMonteurs(new Set());
         setObjectifJournalier('');
         setRisquesAssocies('');
         setObjectifRetarde('');
@@ -282,7 +242,7 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
             chantierEnCours: projectTitle,
             date: today,
             travauxPresent: travauxPresent.trim(),
-            monteursPresent: monteursPresent.trim(),
+            monteursPresent: Array.from(selectedMonteurs).join(', '),
             objectifJournalier: objectifJournalier.trim(),
             risquesAssocies: risquesAssocies.trim(),
             objectifRetarde: objectifRetarde.trim(),
@@ -312,8 +272,7 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
             onClick={handleClose}
         >
             <div
-                className="w-full max-w-md mx-auto mt-auto bg-white rounded-t-[28px] shadow-2xl overflow-hidden flex flex-col"
-                style={{ maxHeight: '92vh' }}
+                className="w-full max-w-md mx-auto mt-auto bg-white rounded-t-[28px] shadow-2xl overflow-hidden flex flex-col max-h-[calc(92dvh-70px)] mb-[70px]"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
@@ -367,13 +326,42 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
                                 onChange={setTravauxPresent}
                                 t={t}
                             />
-                            <VoiceField
-                                label={t('workers_present')}
-                                placeholder={t('workers_names_placeholder')}
-                                value={monteursPresent}
-                                onChange={setMonteursPresent}
-                                t={t}
-                            />
+                            <div className="space-y-1">
+                                <label className="text-[13px] font-semibold text-[#333]">{t('workers_present')}</label>
+                                {monteurs.length === 0 ? (
+                                    <p className="text-[12px] text-[#999] italic px-1">{t('no_workers_defined')}</p>
+                                ) : (
+                                    <div className="border border-gray-200 rounded-xl overflow-hidden divide-y divide-gray-100">
+                                        {monteurs.map((name) => {
+                                            const checked = selectedMonteurs.has(name);
+                                            return (
+                                                <button
+                                                    key={name}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setSelectedMonteurs((prev) => {
+                                                            const next = new Set(prev);
+                                                            if (next.has(name)) next.delete(name);
+                                                            else next.add(name);
+                                                            return next;
+                                                        });
+                                                    }}
+                                                    className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50 active:bg-gray-100"
+                                                >
+                                                    <div className={`w-5 h-5 rounded-[6px] border-2 flex items-center justify-center flex-shrink-0 transition-all ${checked ? 'bg-[#C41230] border-[#C41230]' : 'border-gray-300 bg-white'}`}>
+                                                        {checked && (
+                                                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                                                                <polyline points="20 6 9 17 4 12" />
+                                                            </svg>
+                                                        )}
+                                                    </div>
+                                                    <span className="text-[14px] text-[#222]">{name}</span>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                             <div className="grid grid-cols-2 gap-2 pt-1">
                                 <div className="bg-[#F4F4F6] rounded-xl px-3 py-2">
                                     <div className="text-[10px] text-[#999] font-semibold uppercase tracking-wider mb-0.5">{t('site')}</div>
@@ -434,7 +422,7 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
                                 { label: t('site'), value: projectTitle },
                                 { label: t('date'), value: today },
                                 { label: t('current_work'), value: travauxPresent || '—' },
-                                { label: t('workers_present'), value: monteursPresent || '—' },
+                                { label: t('workers_present'), value: Array.from(selectedMonteurs).join(', ') || '—' },
                                 { label: t('step_daily_goal'), value: objectifJournalier },
                                 { label: t('step_risks'), value: risquesAssocies },
                                 { label: t('step_delayed'), value: objectifRetarde },
@@ -450,7 +438,10 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
                 </div>
 
                 {/* Bottom navigation */}
-                <div className="flex gap-3 px-5 pb-6 pt-3 flex-shrink-0 border-t border-gray-100">
+                <div
+                    className="flex gap-3 px-5 pt-3 flex-shrink-0 border-t border-gray-100"
+                    style={{ paddingBottom: 'max(1.5rem, calc(1.5rem + env(safe-area-inset-bottom)))' }}
+                >
                     {step > 0 && (
                         <button
                             onClick={() => setStep((s) => (s - 1) as WizardStep)}
