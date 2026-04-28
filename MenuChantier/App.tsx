@@ -200,14 +200,25 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, onOutputCh
     return (
         <>
             {currentView === 'schema' ? (
-                <SchemaView
-                    schemaData={schemaData}
-                    onBack={() => setCurrentView('menu')}
-                    onElementClick={(element) => setSelectedElement(element)}
-                    selectedElement={selectedElement}
-                    onCloseModal={() => setSelectedElement(null)}
-                    onPhotoTrigger={handlePhotoTrigger}
-                />
+                <div className="relative w-full h-full">
+                    <SchemaView
+                        schemaData={schemaData}
+                        onBack={() => setCurrentView('menu')}
+                        onElementClick={(element) => setSelectedElement(element)}
+                        selectedElement={selectedElement}
+                        onCloseModal={() => setSelectedElement(null)}
+                        onPhotoTrigger={handlePhotoTrigger}
+                    />
+                    {!point5MinDoneToday && !isPoint5MinOpen && (
+                        <div className="absolute top-0 left-0 right-0 pt-4" style={{ zIndex: 20 }}>
+                            <Point5MinNotification
+                                projectTitle={projectTitle}
+                                onOpen={() => setIsPoint5MinOpen(true)}
+                                t={tr}
+                            />
+                        </div>
+                    )}
+                </div>
             ) : (
                 <div
                     ref={(el: HTMLDivElement | null) => setContainerRef(el)}
@@ -364,14 +375,6 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, onOutputCh
                         </div>
                     )}
 
-                    {/* ── Point 5 min daily notification ── */}
-                    {!point5MinDoneToday && !isPoint5MinOpen && (
-                        <Point5MinNotification
-                            projectTitle={projectTitle}
-                            onOpen={() => setIsPoint5MinOpen(true)}
-                            t={tr}
-                        />
-                    )}
                 </div>
             )}
 
