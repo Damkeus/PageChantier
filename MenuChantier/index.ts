@@ -44,13 +44,14 @@ export class MenuChantier implements ComponentFramework.StandardControl<IInputs,
         const projectJSON = context.parameters.ProjectJSON.raw ?? undefined;
         const jsonSchema = context.parameters.JSONSchema.raw ?? undefined;
         const language = context.parameters.Language.raw ?? undefined;
+        const currentUserName = context.parameters.CurrentUserName?.raw ?? undefined;
 
         const onOutputChange = (key: string, value: string | boolean): void => {
             (this._outputs as Record<string, string | boolean>)[key] = value;
             this._notifyOutputChanged();
         };
 
-        const props = { projectJSON, jsonSchema, language, onOutputChange };
+        const props = { projectJSON, jsonSchema, language, currentUserName, onOutputChange };
 
         ReactDOM.render(
             React.createElement(App, props),

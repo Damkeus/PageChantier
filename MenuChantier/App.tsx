@@ -40,6 +40,7 @@ interface AppProps {
     projectJSON?: string;
     jsonSchema?: string;
     language?: string;
+    currentUserName?: string;
     onOutputChange?: (key: string, value: string | boolean) => void;
 }
 
@@ -69,7 +70,7 @@ interface SpeechRecognitionInstance {
 // MAIN APP
 // =============================================
 
-const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, onOutputChange }) => {
+const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUserName, onOutputChange }) => {
     const [isContactModalOpen, setIsContactModalOpen] = useState(false);
     const [isRapportOpen, setIsRapportOpen] = useState(false);
     const [currentView, setCurrentView] = useState<ViewType>('menu');
@@ -210,7 +211,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, onOutputCh
                         onPhotoTrigger={handlePhotoTrigger}
                     />
                     {!point5MinDoneToday && !isPoint5MinOpen && (
-                        <div className="absolute top-0 left-0 right-0 pt-4" style={{ zIndex: 20 }}>
+                        <div className="absolute left-0 right-0" style={{ top: '72px', zIndex: 20 }}>
                             <Point5MinNotification
                                 projectTitle={projectTitle}
                                 onOpen={() => setIsPoint5MinOpen(true)}
@@ -419,6 +420,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, onOutputCh
                 isOpen={isPoint5MinOpen}
                 projectTitle={projectTitle}
                 monteurs={monteurs}
+                currentUserName={currentUserName}
                 onClose={() => setIsPoint5MinOpen(false)}
                 onSubmit={handlePoint5MinSubmit}
                 t={tr}
@@ -629,24 +631,21 @@ const RapportPanel: React.FC<RapportPanelProps> = ({ isOpen, onClose, onSubmit, 
                 <div className="h-px bg-gray-100 mx-4" />
 
                 <div className="p-4 space-y-3">
-                    <div className="relative">
-                        <textarea
-                            value={text}
-                            onChange={(e) => setText(e.target.value)}
-                            placeholder={t('report_placeholder')}
-                            className="w-full min-h-[120px] border border-gray-200 rounded-xl p-3 pr-12 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-nexans/30 focus:border-nexans"
-                        />
-                        <button
-                            onClick={toggleRecording}
-                            disabled={!speechAvailable}
-                            title={speechAvailable ? (isRecording ? t('stop_dictation') : t('dictate')) : t('not_available')}
-                            className={`absolute bottom-3 right-3 p-2 rounded-full transition-all ${!speechAvailable ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : ''
-                                }${speechAvailable && !isRecording ? ' bg-nexans/10 text-nexans hover:bg-nexans/20' : ''
-                                }${isRecording ? ' bg-nexans text-white animate-pulse-ring' : ''}`}
-                        >
-                            <Mic className="w-5 h-5" />
-                        </button>
-                    </div>
+                    <textarea
+                        value={text}
+                        onChange={(e) => setText(e.target.value)}
+                        placeholder={t('report_placeholder')}
+                        className="w-full min-h-[120px] border border-gray-200 rounded-xl p-3 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-nexans/30 focus:border-nexans"
+                    />
+                    <button
+                        onClick={toggleRecording}
+                        disabled={!speechAvailable}
+                        title={speechAvailable ? (isRecording ? t('stop_dictation') : t('dictate')) : t('not_available')}
+                        className={`w-full flex items-center justify-center gap-3 py-5 rounded-2xl font-bold text-base shadow-sm transition-all active:scale-[0.98] ${!speechAvailable ? 'bg-gray-100 text-gray-300 cursor-not-allowed' : ''}${speechAvailable && !isRecording ? ' bg-nexans/10 text-nexans hover:bg-nexans/20' : ''}${isRecording ? ' bg-nexans text-white animate-pulse-ring' : ''}`}
+                    >
+                        <Mic className="w-8 h-8" />
+                        <span className="text-[17px]">{isRecording ? t('stop_dictation') : t('dictate')}</span>
+                    </button>
 
                     <button
                         onClick={handleSubmit}

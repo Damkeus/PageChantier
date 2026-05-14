@@ -46,6 +46,7 @@ export interface Point5MinPanelProps {
     isOpen: boolean;
     projectTitle: string;
     monteurs: string[];
+    currentUserName?: string;
     onClose: () => void;
     onSubmit: (data: Point5MinData) => void;
     t: (key: TranslationKey) => string;
@@ -107,37 +108,36 @@ const VoiceField: React.FC<VoiceFieldProps> = ({ label, placeholder, value, onCh
     }, [isRecording, value, onChange]);
 
     return (
-        <div className="space-y-1">
+        <div className="space-y-2">
             <label className="text-[13px] font-semibold text-[#333]">{label}</label>
-            <div className="relative">
-                <textarea
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                    placeholder={placeholder}
-                    rows={4}
-                    className="w-full border border-gray-200 rounded-xl p-3 pr-12 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#C41230]/30 focus:border-[#C41230]"
-                />
-                <button
-                    type="button"
-                    onClick={toggleRecording}
-                    disabled={!speechAvailableOnce}
-                    title={speechAvailableOnce ? (isRecording ? t('stop_dictation') : t('dictate')) : t('not_available')}
-                    className={`absolute bottom-3 right-3 p-2 rounded-full transition-all ${
-                        !speechAvailableOnce
-                            ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                            : isRecording
-                            ? 'bg-[#C41230] text-white animate-pulse'
-                            : 'bg-[#FEE8EC] text-[#C41230] hover:bg-[#fdd0d6]'
-                    }`}
-                >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="9" y="2" width="6" height="12" rx="3" />
-                        <path d="M5 10a7 7 0 0014 0" />
-                        <line x1="12" y1="19" x2="12" y2="22" />
-                        <line x1="9" y1="22" x2="15" y2="22" />
-                    </svg>
-                </button>
-            </div>
+            <textarea
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder={placeholder}
+                rows={4}
+                className="w-full border border-gray-200 rounded-xl p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#C41230]/30 focus:border-[#C41230]"
+            />
+            <button
+                type="button"
+                onClick={toggleRecording}
+                disabled={!speechAvailableOnce}
+                title={speechAvailableOnce ? (isRecording ? t('stop_dictation') : t('dictate')) : t('not_available')}
+                className={`w-full flex items-center justify-center gap-3 py-4 rounded-2xl text-[16px] font-bold transition-all shadow-sm ${
+                    !speechAvailableOnce
+                        ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                        : isRecording
+                        ? 'bg-[#C41230] text-white animate-pulse'
+                        : 'bg-[#FEE8EC] text-[#C41230] hover:bg-[#fdd0d6] active:scale-[0.98]'
+                }`}
+            >
+                <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="9" y="2" width="6" height="12" rx="3" />
+                    <path d="M5 10a7 7 0 0014 0" />
+                    <line x1="12" y1="19" x2="12" y2="22" />
+                    <line x1="9" y1="22" x2="15" y2="22" />
+                </svg>
+                <span>{isRecording ? t('stop_dictation') : t('dictate')}</span>
+            </button>
         </div>
     );
 };
@@ -195,6 +195,7 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
     isOpen,
     projectTitle,
     monteurs,
+    currentUserName,
     onClose,
     onSubmit,
     t,
@@ -202,7 +203,7 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
     const [step, setStep] = useState<WizardStep>(0);
     const today = new Date().toISOString().split('T')[0];
 
-    const [userChantier, setUserChantier] = useState('');
+    const userChantier = (currentUserName ?? '').trim();
     const [travauxPresent, setTravauxPresent] = useState('');
     const [selectedMonteurs, setSelectedMonteurs] = useState<Set<string>>(new Set());
 
@@ -222,7 +223,6 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
 
     const resetState = () => {
         setStep(0);
-        setUserChantier('');
         setTravauxPresent('');
         setSelectedMonteurs(new Set());
         setObjectifJournalier('');
@@ -238,7 +238,7 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
 
     const handleValidate = () => {
         const data: Point5MinData = {
-            userChantier: userChantier.trim(),
+            userChantier: userChantier,
             chantierEnCours: projectTitle,
             date: today,
             travauxPresent: travauxPresent.trim(),
@@ -253,7 +253,7 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
     };
 
     const canProceed = (): boolean => {
-        if (step === 0) return userChantier.trim().length > 0;
+        if (step === 0) return userChantier.length > 0;
         if (step === 1) return objectifJournalier.trim().length > 0;
         if (step === 2) return risquesAssocies.trim().length > 0;
         if (step === 3) return objectifRetarde.trim().length > 0;
@@ -312,13 +312,22 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
                 <div className="flex-1 overflow-y-auto p-5 space-y-4">
                     {step === 0 && (
                         <>
-                            <VoiceField
-                                label={t('who_briefing')}
-                                placeholder={t('your_name_placeholder')}
-                                value={userChantier}
-                                onChange={setUserChantier}
-                                t={t}
-                            />
+                            <div className="space-y-1">
+                                <label className="text-[13px] font-semibold text-[#333]">{t('who_briefing')}</label>
+                                <div className="w-full border border-gray-200 bg-[#F4F4F6] rounded-xl px-3 py-3 flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-full bg-[#FEE8EC] text-[#C41230] flex items-center justify-center text-[14px] font-bold flex-shrink-0">
+                                        {userChantier
+                                            ? userChantier.split(' ').map((w) => w[0] ?? '').join('').slice(0, 2).toUpperCase()
+                                            : '?'}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[14px] font-semibold text-[#222] truncate">
+                                            {userChantier || t('your_name_placeholder')}
+                                        </div>
+                                        <div className="text-[11px] text-[#999]">{t('responsible')}</div>
+                                    </div>
+                                </div>
+                            </div>
                             <VoiceField
                                 label={t('current_work')}
                                 placeholder={t('describe_work_placeholder')}
@@ -440,7 +449,7 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
                 {/* Bottom navigation */}
                 <div
                     className="flex gap-3 px-5 pt-3 flex-shrink-0 border-t border-gray-100"
-                    style={{ paddingBottom: 'max(1.5rem, calc(1.5rem + env(safe-area-inset-bottom)))' }}
+                    style={{ paddingBottom: 'max(7.5rem, calc(7.5rem + env(safe-area-inset-bottom)))' }}
                 >
                     {step > 0 && (
                         <button

@@ -143,7 +143,7 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
                                         <button
                                             key={element.id}
                                             onClick={() => onElementClick(element)}
-                                            className="flex-shrink-0 bg-white rounded-xl shadow-sm p-2.5 transition-all hover:shadow-md active:scale-95 group w-32"
+                                            className="flex-shrink-0 bg-white rounded-xl shadow-sm p-3 transition-all hover:shadow-md active:scale-95 group w-[147px]"
                                         >
                                             {/* Image */}
                                             <div className="w-full aspect-square rounded-lg overflow-hidden bg-gray-50 mb-2 group-hover:bg-nexans-light/10 transition-colors">
@@ -156,10 +156,10 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
                                             </div>
                                             {/* Info */}
                                             <div className="text-center">
-                                                <p className="text-sm font-bold text-gray-800 group-hover:text-nexans transition-colors">
+                                                <p className="text-[15px] font-bold text-gray-800 group-hover:text-nexans transition-colors">
                                                     {element.label}
                                                 </p>
-                                                <p className="text-[9px] text-gray-400 mt-0.5 truncate">
+                                                <p className="text-[10px] text-gray-400 mt-0.5 truncate">
                                                     {element.type}
                                                 </p>
                                             </div>
