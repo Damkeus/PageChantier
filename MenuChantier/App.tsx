@@ -169,6 +169,13 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
         }
     };
 
+    const handlePoint5MinChange = (data: Point5MinData) => {
+        if (onOutputChange) {
+            onOutputChange('Point5MinJSON', JSON.stringify(data));
+            onOutputChange('Point5MinTimestamp', new Date().toISOString());
+        }
+    };
+
     const handlePoint5MinSubmit = (data: Point5MinData) => {
         const today = new Date().toISOString().split('T')[0];
         const key = `p5m_done_${encodeURIComponent(projectTitle)}_${today}`;
@@ -419,10 +426,12 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
             <Point5MinPanel
                 isOpen={isPoint5MinOpen}
                 projectTitle={projectTitle}
+                projectUniqID={project?.ProjectUniqID}
                 monteurs={monteurs}
                 currentUserName={currentUserName}
                 onClose={() => setIsPoint5MinOpen(false)}
                 onSubmit={handlePoint5MinSubmit}
+                onDataChange={handlePoint5MinChange}
                 t={tr}
             />
 

@@ -6,6 +6,7 @@ import { type TranslationKey } from './i18n';
 // =============================================
 
 export interface Point5MinData {
+    projectUniqID: string;
     userChantier: string;
     chantierEnCours: string;
     date: string;
@@ -45,10 +46,12 @@ export interface Point5MinNotificationProps {
 export interface Point5MinPanelProps {
     isOpen: boolean;
     projectTitle: string;
+    projectUniqID?: string;
     monteurs: string[];
     currentUserName?: string;
     onClose: () => void;
     onSubmit: (data: Point5MinData) => void;
+    onDataChange?: (data: Point5MinData) => void;
     t: (key: TranslationKey) => string;
 }
 
@@ -194,10 +197,12 @@ const TOTAL_STEPS = 5;
 export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
     isOpen,
     projectTitle,
+    projectUniqID,
     monteurs,
     currentUserName,
     onClose,
     onSubmit,
+    onDataChange,
     t,
 }) => {
     const [step, setStep] = useState<WizardStep>(0);
@@ -211,6 +216,22 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
     const [risquesAssocies, setRisquesAssocies] = useState('');
     const [objectifRetarde, setObjectifRetarde] = useState('');
     const [pointSupplementaire, setPointSupplementaire] = useState('');
+
+    React.useEffect(() => {
+        if (!isOpen || !onDataChange) return;
+        onDataChange({
+            projectUniqID: projectUniqID ?? '',
+            userChantier,
+            chantierEnCours: projectTitle,
+            date: today,
+            travauxPresent: travauxPresent.trim(),
+            monteursPresent: Array.from(selectedMonteurs).join(', '),
+            objectifJournalier: objectifJournalier.trim(),
+            risquesAssocies: risquesAssocies.trim(),
+            objectifRetarde: objectifRetarde.trim(),
+            pointSupplementaire: pointSupplementaire.trim(),
+        });
+    }, [isOpen, travauxPresent, selectedMonteurs, objectifJournalier, risquesAssocies, objectifRetarde, pointSupplementaire]);
 
     const stepTitles: Record<number, string> = {
         0: t('step_context'),
@@ -238,6 +259,7 @@ export const Point5MinPanel: React.FC<Point5MinPanelProps> = ({
 
     const handleValidate = () => {
         const data: Point5MinData = {
+            projectUniqID: projectUniqID ?? '',
             userChantier: userChantier,
             chantierEnCours: projectTitle,
             date: today,
