@@ -47,6 +47,19 @@ interface AppProps {
 type ViewType = 'menu' | 'schema';
 type Breakpoint = 'mobile' | 'tablet' | 'desktop';
 
+interface PhotoPayloadItem {
+    base64: string;
+    fileName: string;
+    photoType: 'general' | 'schema';
+    zoneLabel: string;
+}
+
+function generatePhotoFileName(prefix: string): string {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const random = Math.floor(Math.random() * 900 + 100);
+    return `${prefix}_${timestamp}_${random}`;
+}
+
 interface SpeechRecognitionResult {
     readonly transcript: string;
 }
@@ -76,6 +89,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
     const [currentView, setCurrentView] = useState<ViewType>('menu');
     const [selectedElement, setSelectedElement] = useState<SchemaElement | null>(null);
     const [isPhotoOpen, setIsPhotoOpen] = useState(false);
+    const [photoContext, setPhotoContext] = useState<string>('general');
     const [isPoint5MinOpen, setIsPoint5MinOpen] = useState(false);
     const [isPMNotifOpen, setIsPMNotifOpen] = useState(false);
 
@@ -162,7 +176,8 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
         }
     };
 
-    const handlePhotoTrigger = () => {
+    const handlePhotoTrigger = (zoneLabel?: string) => {
+        setPhotoContext(zoneLabel ?? 'general');
         setIsPhotoOpen(true);
         if (onOutputChange) {
             onOutputChange('PhotoTrigger', true);
@@ -215,7 +230,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
                         onElementClick={(element) => setSelectedElement(element)}
                         selectedElement={selectedElement}
                         onCloseModal={() => setSelectedElement(null)}
-                        onPhotoTrigger={handlePhotoTrigger}
+                        onPhotoTrigger={(zoneLabel) => handlePhotoTrigger(zoneLabel)}
                     />
                     {!point5MinDoneToday && !isPoint5MinOpen && (
                         <div className="absolute left-0 right-0" style={{ top: '72px', zIndex: 20 }}>
@@ -362,7 +377,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
                         </button>
 
                         <button
-                            onClick={handlePhotoTrigger}
+                            onClick={() => handlePhotoTrigger()}
                             className="bg-white rounded-[20px] px-3 py-5 flex flex-col items-center gap-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.07)] active:scale-[0.96] transition-all border-none"
                         >
                             <div className="w-[52px] h-[52px] rounded-[16px] bg-[#FEE8EC] flex items-center justify-center">
@@ -413,9 +428,18 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
                 onClose={() => {
                     setIsPhotoOpen(false);
                 }}
-                onPhotoCapture={(base64) => {
+                onPhotoCapture={(base64ArrayJson) => {
                     if (onOutputChange) {
-                        onOutputChange('PhotoBase64', base64);
+                        const photos: string[] = JSON.parse(base64ArrayJson) as string[];
+                        const isGeneral = photoContext === 'general';
+                        const payload: PhotoPayloadItem[] = photos.map((b64) => ({
+                            base64: b64,
+                            fileName: generatePhotoFileName(photoContext),
+                            photoType: isGeneral ? 'general' : 'schema',
+                            zoneLabel: photoContext,
+                        }));
+                        onOutputChange('PhotoPayloadJSON', JSON.stringify(payload));
+                        onOutputChange('PhotoBase64', base64ArrayJson);
                         onOutputChange('PhotoTrigger', true);
                     }
                 }}

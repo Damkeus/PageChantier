@@ -80,7 +80,7 @@ interface SchemaViewProps {
     onElementClick: (element: SchemaElement) => void;
     selectedElement: SchemaElement | null;
     onCloseModal: () => void;
-    onPhotoTrigger?: () => void;
+    onPhotoTrigger?: (zoneLabel: string) => void;
 }
 
 export const SchemaView: React.FC<SchemaViewProps> = ({
@@ -192,13 +192,13 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
 interface SchemaElementModalProps {
     element: SchemaElement;
     onClose: () => void;
-    onPhotoTrigger?: () => void;
+    onPhotoTrigger?: (zoneLabel: string) => void;
 }
 
 export const SchemaElementModal: React.FC<SchemaElementModalProps> = ({ element, onClose, onPhotoTrigger }) => {
     const handleAction = (action: string) => {
         if (action === 'Photo' && onPhotoTrigger) {
-            onPhotoTrigger();
+            onPhotoTrigger(element.label);
             return;
         }
         console.log(`Action: ${action} for element:`, element);
