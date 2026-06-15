@@ -60,6 +60,12 @@ function generatePhotoFileName(prefix: string): string {
     return `${prefix}_${timestamp}_${random}`;
 }
 
+/** Retire le préfixe data URI (ex: "data:image/jpeg;base64,") pour Power Automate */
+function stripDataUri(base64: string): string {
+    const idx = base64.indexOf(',');
+    return idx >= 0 ? base64.slice(idx + 1) : base64;
+}
+
 interface SpeechRecognitionResult {
     readonly transcript: string;
 }
@@ -433,7 +439,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
                         const photos: string[] = JSON.parse(base64ArrayJson) as string[];
                         const isGeneral = photoContext === 'general';
                         const payload: PhotoPayloadItem[] = photos.map((b64) => ({
-                            base64: b64,
+                            base64: stripDataUri(b64),   // base64 pur sans préfixe data URI
                             fileName: generatePhotoFileName(photoContext),
                             photoType: isGeneral ? 'general' : 'schema',
                             zoneLabel: photoContext,
