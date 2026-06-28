@@ -201,7 +201,6 @@ export const SchemaElementModal: React.FC<SchemaElementModalProps> = ({ element,
             onPhotoTrigger(element.label);
             return;
         }
-        console.log(`Action: ${action} for element:`, element);
     };
 
     return (
