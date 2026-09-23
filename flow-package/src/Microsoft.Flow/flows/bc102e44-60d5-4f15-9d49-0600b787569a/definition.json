@@ -1,0 +1,171 @@
+{
+  "name": "bc102e44-60d5-4f15-9d49-0600b787569a",
+  "id": "/providers/Microsoft.Flow/flows/bc102e44-60d5-4f15-9d49-0600b787569a",
+  "type": "Microsoft.Flow/flows",
+  "properties": {
+    "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+    "displayName": "EnvoiPhotosChantier",
+    "definition": {
+      "metadata": {
+        "workflowEntityId": null,
+        "processAdvisorMetadata": null,
+        "flowChargedByPaygo": null,
+        "flowclientsuspensionreason": "None",
+        "flowclientsuspensiontime": null,
+        "flowclientsuspensionreasondetails": "",
+        "provisioningMethod": "FromDefinition",
+        "failureAlertSubscription": true,
+        "creationSource": "Portal",
+        "modifiedSources": "Portal"
+      },
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "PowerAppV2",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "siteUrl": {
+                  "type": "string",
+                  "description": "URL du site SharePoint (ex: https://contoso.sharepoint.com/sites/chantiers)",
+                  "x-ms-dynamically-added": true,
+                  "x-ms-content-hint": "TEXT"
+                },
+                "projectName": {
+                  "type": "string",
+                  "description": "Nom du projet / chantier",
+                  "x-ms-dynamically-added": true,
+                  "x-ms-content-hint": "TEXT"
+                },
+                "photosJson": {
+                  "type": "string",
+                  "description": "PhotoPayloadJSON du PCF : [{base64, fileName, photoType, zoneLabel, liaison}]",
+                  "x-ms-dynamically-added": true,
+                  "x-ms-content-hint": "TEXT"
+                }
+              },
+              "required": [
+                "siteUrl",
+                "projectName",
+                "photosJson"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Photos": {
+          "type": "Compose",
+          "inputs": "@json(triggerBody()?['photosJson'])",
+          "runAfter": {}
+        },
+        "Pour_chaque_photo": {
+          "type": "Foreach",
+          "foreach": "@outputs('Photos')",
+          "actions": {
+            "Creer_dossier": {
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "CreateNewFolder",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@triggerBody()?['siteUrl']",
+                  "table": "Documents",
+                  "path": "@concat('Chantiers/', triggerBody()?['projectName'], '/', if(empty(items('Pour_chaque_photo')?['liaison']), 'General', items('Pour_chaque_photo')?['liaison']))"
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "Creer_fichier": {
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "CreateFile",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                },
+                "parameters": {
+                  "dataset": "@triggerBody()?['siteUrl']",
+                  "folderPath": "@concat('Documents/Chantiers/', triggerBody()?['projectName'], '/', if(empty(items('Pour_chaque_photo')?['liaison']), 'General', items('Pour_chaque_photo')?['liaison']))",
+                  "name": "@concat(items('Pour_chaque_photo')?['fileName'], '.jpg')",
+                  "body": "@base64ToBinary(items('Pour_chaque_photo')?['base64'])",
+                  "overwrite": true
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {
+                "Creer_dossier": [
+                  "Succeeded",
+                  "Failed"
+                ]
+              }
+            }
+          },
+          "runAfter": {
+            "Photos": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Repondre_a_PowerApps": {
+          "type": "Response",
+          "kind": "PowerApp",
+          "inputs": {
+            "statusCode": 200,
+            "body": {
+              "result": "ok",
+              "count": "@{length(outputs('Photos'))}"
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "result": {
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                },
+                "count": {
+                  "type": "string",
+                  "x-ms-dynamically-added": true
+                }
+              }
+            }
+          },
+          "runAfter": {
+            "Pour_chaque_photo": [
+              "Succeeded"
+            ]
+          }
+        }
+      }
+    },
+    "connectionReferences": {
+      "shared_sharepointonline": {
+        "connectionName": "shared_sharepointonline",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+        "tier": "NotSpecified",
+        "apiName": "sharepointonline",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      }
+    },
+    "flowFailureAlertSubscribed": false,
+    "isManaged": false
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "1.0",
+  "details": {
+    "displayName": "EnvoiPhotosChantier",
+    "description": "Recoit les photos du PCF MenuChantier (payload JSON) et les enregistre dans SharePoint sous Chantiers/<projet>/<liaison>.",
+    "createdTime": "2026-07-13T10:00:00.0000000Z",
+    "packageTelemetryId": "9fb15b1f-d61c-47ee-95c1-bcc632b49be6",
+    "creator": "N/A",
+    "sourceEnvironment": ""
+  },
+  "resources": {
+    "bc102e44-60d5-4f15-9d49-0600b787569a": {
+      "type": "Microsoft.Flow/flows",
+      "suggestedCreationType": "New",
+      "creationType": "Existing, New, Update",
+      "details": {
+        "displayName": "EnvoiPhotosChantier"
+      },
+      "configurableBy": "User",
+      "hierarchy": "Root",
+      "dependsOn": [
+        "ff74fdab-cdc5-4eb7-9b75-e3f9728f6a3e",
+        "e0166063-d72c-445d-bf4b-6fa0d0176a38"
+      ]
+    },
+    "ff74fdab-cdc5-4eb7-9b75-e3f9728f6a3e": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+      "name": "shared_sharepointonline",
+      "type": "Microsoft.PowerApps/apis",
+      "suggestedCreationType": "Existing",
+      "details": {
+        "displayName": "SharePoint",
+        "iconUri": "https://static.powerapps.com/resource/ppcr/releases/v1.0.1813/1.0.1813.4743/sharepointonline/icon.png"
+      },
+      "configurableBy": "System",
+      "hierarchy": "Child",
+      "dependsOn": []
+    },
+    "e0166063-d72c-445d-bf4b-6fa0d0176a38": {
+      "type": "Microsoft.PowerApps/apis/connections",
+      "suggestedCreationType": "Existing",
+      "creationType": "Existing",
+      "details": {
+        "displayName": "SharePoint",
+        "iconUri": "https://static.powerapps.com/resource/ppcr/releases/v1.0.1813/1.0.1813.4743/sharepointonline/icon.png"
+      },
+      "configurableBy": "User",
+      "hierarchy": "Child",
+      "dependsOn": [
+        "ff74fdab-cdc5-4eb7-9b75-e3f9728f6a3e"
+      ]
+    }
+  }
+}

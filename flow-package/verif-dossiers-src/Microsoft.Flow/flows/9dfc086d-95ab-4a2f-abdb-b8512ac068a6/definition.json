@@ -1,0 +1,355 @@
+{
+  "name": "9dfc086d-95ab-4a2f-abdb-b8512ac068a6",
+  "id": "/providers/Microsoft.Flow/flows/9dfc086d-95ab-4a2f-abdb-b8512ac068a6",
+  "type": "Microsoft.Flow/flows",
+  "properties": {
+    "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+    "displayName": "VerifierDossiersSchema",
+    "definition": {
+      "metadata": {
+        "workflowEntityId": null,
+        "processAdvisorMetadata": null,
+        "flowChargedByPaygo": null,
+        "flowclientsuspensionreason": "None",
+        "flowclientsuspensiontime": null,
+        "flowclientsuspensionreasondetails": "",
+        "provisioningMethod": "FromDefinition",
+        "failureAlertSubscription": true,
+        "creationSource": "Portal",
+        "modifiedSources": "Portal"
+      },
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        },
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        }
+      },
+      "triggers": {
+        "manual": {
+          "type": "Request",
+          "kind": "PowerAppV2",
+          "inputs": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "projectUniqID": {
+                  "type": "string",
+                  "description": "ProjectUniqID du chantier (sortie schemaProjectUniqId du PCF PageFicheChantier)",
+                  "x-ms-dynamically-added": true,
+                  "x-ms-content-hint": "TEXT"
+                },
+                "schemaJson": {
+                  "type": "string",
+                  "description": "Enveloppe de schema v2 (sortie schemaChange du PCF PageFicheChantier)",
+                  "x-ms-dynamically-added": true,
+                  "x-ms-content-hint": "TEXT"
+                }
+              },
+              "required": [
+                "projectUniqID",
+                "schemaJson"
+              ]
+            }
+          }
+        }
+      },
+      "actions": {
+        "Liaisons": {
+          "type": "Compose",
+          "inputs": "@coalesce(json(triggerBody()?['schemaJson'])?['liaisons'], createArray())",
+          "runAfter": {}
+        },
+        "Ordres": {
+          "type": "Select",
+          "inputs": {
+            "from": "@outputs('Liaisons')",
+            "select": "@coalesce(item()?['ordreSchema'], '')"
+          },
+          "runAfter": {
+            "Liaisons": [
+              "Succeeded"
+            ]
+          }
+        },
+        "AllOrdres": {
+          "type": "Compose",
+          "inputs": "@join(body('Ordres'), '')",
+          "runAfter": {
+            "Ordres": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Get_items": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_sharepointonline",
+              "operationId": "GetItems",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+            },
+            "parameters": {
+              "dataset": "https://nexans.sharepoint.com/sites/t-nex",
+              "table": "Table Fiche Chantier",
+              "$filter": "@concat('ProjectUniqID eq ''', triggerBody()?['projectUniqID'], '''')",
+              "$top": 1
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "AllOrdres": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Initialize_varFolderPath": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "varFolderPath",
+                "type": "string",
+                "value": "@coalesce(first(body('Get_items')?['value'])?['FolderPath'], '')"
+              }
+            ]
+          },
+          "runAfter": {
+            "Get_items": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Verifier_schema_non_vide": {
+          "type": "If",
+          "expression": "@and(not(equals(outputs('AllOrdres'), '')), not(equals(variables('varFolderPath'), '')))",
+          "actions": {
+            "Library": {
+              "type": "Compose",
+              "inputs": "@first(split(trim(variables('varFolderPath'), '/'), '/'))",
+              "runAfter": {}
+            },
+            "RelativePath": {
+              "type": "Compose",
+              "inputs": "@join(skip(split(trim(variables('varFolderPath'), '/'), '/'), 1), '/')",
+              "runAfter": {
+                "Library": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "TablettePath": {
+              "type": "Compose",
+              "inputs": "@concat(outputs('RelativePath'), '/6. Tablette')",
+              "runAfter": {
+                "RelativePath": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Pour_chaque_liaison": {
+              "type": "Foreach",
+              "foreach": "@range(0, length(outputs('Liaisons')))",
+              "actions": {
+                "LiaisonName": {
+                  "type": "Compose",
+                  "inputs": "@if(equals(trim(coalesce(outputs('Liaisons')?[items('Pour_chaque_liaison')]?['comment'], '')), ''), concat('Liaison ', string(add(items('Pour_chaque_liaison'), 1))), trim(outputs('Liaisons')?[items('Pour_chaque_liaison')]?['comment']))",
+                  "runAfter": {}
+                },
+                "SafeLiaisonName": {
+                  "type": "Compose",
+                  "inputs": "@replace(replace(replace(replace(replace(replace(replace(replace(replace(outputs('LiaisonName'), '\"', '_'), '*', '_'), ':', '_'), '<', '_'), '>', '_'), '?', '_'), '/', '_'), '\\', '_'), '|', '_')",
+                  "runAfter": {
+                    "LiaisonName": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "Verifier_liaison_non_vide": {
+                  "type": "If",
+                  "expression": "@greater(length(coalesce(outputs('Liaisons')?[items('Pour_chaque_liaison')]?['elements'], createArray())), 0)",
+                  "actions": {
+                    "Creer_dossier_liaison": {
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_sharepointonline",
+                          "operationId": "CreateNewFolder",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                        },
+                        "parameters": {
+                          "dataset": "https://nexans.sharepoint.com/sites/t-nex",
+                          "table": "@outputs('Library')",
+                          "body/path": "@concat(outputs('TablettePath'), '/', outputs('SafeLiaisonName'))"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      },
+                      "runAfter": {}
+                    },
+                    "Lister_elements_existants": {
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_sharepointonline",
+                          "operationId": "ListFolder",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                        },
+                        "parameters": {
+                          "dataset": "https://nexans.sharepoint.com/sites/t-nex",
+                          "id": "@concat(outputs('Library'), '/', outputs('TablettePath'), '/', outputs('SafeLiaisonName'))"
+                        },
+                        "authentication": "@parameters('$authentication')"
+                      },
+                      "runAfter": {
+                        "Creer_dossier_liaison": [
+                          "Succeeded",
+                          "Failed"
+                        ]
+                      }
+                    },
+                    "ElementsBruts": {
+                      "type": "Compose",
+                      "inputs": "@if(equals(coalesce(outputs('Lister_elements_existants')?['statusCode'], 0), 200), coalesce(body('Lister_elements_existants'), createArray()), createArray())",
+                      "runAfter": {
+                        "Lister_elements_existants": [
+                          "Succeeded",
+                          "Failed"
+                        ]
+                      }
+                    },
+                    "ExistingElementNames": {
+                      "type": "Select",
+                      "inputs": {
+                        "from": "@outputs('ElementsBruts')",
+                        "select": "@coalesce(item()?['Name'], '')"
+                      },
+                      "runAfter": {
+                        "ElementsBruts": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Pour_chaque_element": {
+                      "type": "Foreach",
+                      "foreach": "@range(0, length(coalesce(outputs('Liaisons')?[items('Pour_chaque_liaison')]?['elements'], createArray())))",
+                      "actions": {
+                        "ElementName": {
+                          "type": "Compose",
+                          "inputs": "@if(equals(trim(coalesce(outputs('Liaisons')?[items('Pour_chaque_liaison')]?['elements']?[items('Pour_chaque_element')]?['label'], '')), ''), concat(if(equals(outputs('Liaisons')?[items('Pour_chaque_liaison')]?['elements']?[items('Pour_chaque_element')]?['type'], 'termination'), 'Extrémité', 'Jonction'), ' ', string(add(items('Pour_chaque_element'), 1))), trim(outputs('Liaisons')?[items('Pour_chaque_liaison')]?['elements']?[items('Pour_chaque_element')]?['label']))",
+                          "runAfter": {}
+                        },
+                        "SafeElementName": {
+                          "type": "Compose",
+                          "inputs": "@replace(replace(replace(replace(replace(replace(replace(replace(replace(outputs('ElementName'), '\"', '_'), '*', '_'), ':', '_'), '<', '_'), '>', '_'), '?', '_'), '/', '_'), '\\', '_'), '|', '_')",
+                          "runAfter": {
+                            "ElementName": [
+                              "Succeeded"
+                            ]
+                          }
+                        },
+                        "Verifier_element_manquant": {
+                          "type": "If",
+                          "expression": "@not(contains(body('ExistingElementNames'), outputs('SafeElementName')))",
+                          "actions": {
+                            "Creer_dossier_element": {
+                              "type": "OpenApiConnection",
+                              "inputs": {
+                                "host": {
+                                  "connectionName": "shared_sharepointonline",
+                                  "operationId": "CreateNewFolder",
+                                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                                },
+                                "parameters": {
+                                  "dataset": "https://nexans.sharepoint.com/sites/t-nex",
+                                  "table": "@outputs('Library')",
+                                  "body/path": "@concat(outputs('TablettePath'), '/', outputs('SafeLiaisonName'), '/', outputs('SafeElementName'))"
+                                },
+                                "authentication": "@parameters('$authentication')"
+                              },
+                              "runAfter": {}
+                            },
+                            "Fin_creation_element": {
+                              "type": "Compose",
+                              "inputs": "@concat('Dossier traite : ', outputs('SafeElementName'))",
+                              "runAfter": {
+                                "Creer_dossier_element": [
+                                  "Succeeded",
+                                  "Failed"
+                                ]
+                              }
+                            }
+                          },
+                          "else": {
+                            "actions": {}
+                          },
+                          "runAfter": {
+                            "SafeElementName": [
+                              "Succeeded"
+                            ]
+                          }
+                        }
+                      },
+                      "runtimeConfiguration": {
+                        "concurrency": {
+                          "repetitions": 1
+                        }
+                      },
+                      "runAfter": {
+                        "ExistingElementNames": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {}
+                  },
+                  "runAfter": {
+                    "SafeLiaisonName": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "runtimeConfiguration": {
+                "concurrency": {
+                  "repetitions": 1
+                }
+              },
+              "runAfter": {
+                "TablettePath": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "runAfter": {
+            "Initialize_varFolderPath": [
+              "Succeeded"
+            ]
+          }
+        }
+      }
+    },
+    "connectionReferences": {
+      "shared_sharepointonline": {
+        "connectionName": "shared_sharepointonline",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+        "tier": "NotSpecified",
+        "apiName": "sharepointonline",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      }
+    },
+    "flowFailureAlertSubscribed": false,
+    "isManaged": false
+  }
+}

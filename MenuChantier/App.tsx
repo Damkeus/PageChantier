@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useRef, useEffect, useCallback } from 'react';
 import { MapPin, FileText, Activity, ClipboardEdit, Navigation, Camera, Phone, X, User, Mic } from './Icons';
-import { SchemaView } from './SchemaComponents';
-import type { SchemaElement, SchemaData } from './SchemaComponents';
-import { Point5MinNotification, Point5MinPanel } from './Point5MinPanel';
+import { SchemaView, normalizeSchemaInput, NativeCameraCapture } from './SchemaComponents';
+import type { SchemaElement } from './SchemaComponents';
+import { Point5MinPanel } from './Point5MinPanel';
 import { PMNotificationBanner, PMNotificationPanel } from './PMNotificationPanel';
 import type { PMNotification } from './PMNotificationPanel';
 import type { Point5MinData } from './Point5MinPanel';
@@ -41,6 +41,12 @@ interface AppProps {
     jsonSchema?: string;
     language?: string;
     currentUserName?: string;
+    /** Hauteur de la barre de navigation d'un autre PCF posée par-dessus (px). */
+    bottomSafeArea?: number;
+    /** Dossier SharePoint du chantier — cible du bouton Notice du schéma. */
+    sharepointUrl?: string;
+    /** Caméra native Power Apps (app mobile uniquement). */
+    captureImage?: NativeCameraCapture;
     onOutputChange?: (key: string, value: string | boolean) => void;
 }
 
@@ -52,12 +58,23 @@ interface PhotoPayloadItem {
     fileName: string;
     photoType: 'general' | 'schema';
     zoneLabel: string;
+    liaison: string;
+}
+
+interface PhotoContext {
+    zoneLabel: string;
+    liaisonName: string;
 }
 
 function generatePhotoFileName(prefix: string): string {
     const timestamp = Math.floor(Date.now() / 1000);
     const random = Math.floor(Math.random() * 900 + 100);
     return `${prefix}_${timestamp}_${random}`;
+}
+
+/** Nom de fichier compatible SharePoint (labels type "Transfo LSA" contiennent des espaces). */
+function sanitizeFileNamePart(value: string): string {
+    return value.replace(/[^A-Za-z0-9_-]/g, '_');
 }
 
 /** Retire le préfixe data URI (ex: "data:image/jpeg;base64,") pour Power Automate */
@@ -89,13 +106,13 @@ interface SpeechRecognitionInstance {
 // MAIN APP
 // =============================================
 
-const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUserName, onOutputChange }) => {
+const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUserName, bottomSafeArea, sharepointUrl, captureImage, onOutputChange }) => {
     const [isContactModalOpen, setIsContactModalOpen] = useState(false);
     const [isRapportOpen, setIsRapportOpen] = useState(false);
     const [currentView, setCurrentView] = useState<ViewType>('menu');
     const [selectedElement, setSelectedElement] = useState<SchemaElement | null>(null);
     const [isPhotoOpen, setIsPhotoOpen] = useState(false);
-    const [photoContext, setPhotoContext] = useState<string>('general');
+    const [photoContext, setPhotoContext] = useState<PhotoContext>({ zoneLabel: 'general', liaisonName: '' });
     const [isPoint5MinOpen, setIsPoint5MinOpen] = useState(false);
     const [isPMNotifOpen, setIsPMNotifOpen] = useState(false);
 
@@ -163,17 +180,10 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
             .filter((name): name is string => !!name);
     }, [project]);
 
-    const schemaData = useMemo((): SchemaData | null => {
-        if (project?.ordreSchema) {
-            return { ordreSchema: project.ordreSchema };
-        }
-        try {
-            return jsonSchema ? JSON.parse(jsonSchema) as SchemaData : null;
-        } catch (e) {
-            console.error("Failed to parse JSONSchema", e);
-            return null;
-        }
-    }, [project, jsonSchema]);
+    const { liaisons, jsonSchemaError } = useMemo(
+        () => normalizeSchemaInput(jsonSchema, project?.ordreSchema),
+        [project, jsonSchema]
+    );
 
     const handleOpenGPS = () => {
         if (project?.AddressChantier) {
@@ -182,8 +192,54 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
         }
     };
 
-    const handlePhotoTrigger = (zoneLabel?: string) => {
-        setPhotoContext(zoneLabel ?? 'general');
+    /** Construit et émet le payload photo (capture caméra ou upload fichier). */
+    const emitPhotoPayload = useCallback((photos: string[], zoneLabel: string, liaisonName: string) => {
+        if (!onOutputChange) return;
+        const isGeneral = zoneLabel === 'general';
+        const finalZoneLabel = liaisonName ? `${liaisonName} - ${zoneLabel}` : zoneLabel;
+        const fileNamePrefix = sanitizeFileNamePart(
+            [liaisonName, zoneLabel].filter(Boolean).join('_')
+        );
+        const payload: PhotoPayloadItem[] = photos.map((b64) => ({
+            base64: stripDataUri(b64),   // base64 pur sans préfixe data URI
+            fileName: generatePhotoFileName(fileNamePrefix),
+            photoType: isGeneral ? 'general' : 'schema',
+            zoneLabel: finalZoneLabel,
+            liaison: liaisonName,
+        }));
+        onOutputChange('PhotoPayloadJSON', JSON.stringify(payload));
+        onOutputChange('PhotoBase64', JSON.stringify(photos));
+        onOutputChange('PhotoTrigger', true);
+    }, [onOutputChange]);
+
+    /** Référence stable : SchemaView la rappelle depuis un effet. */
+    const closeElementSheet = useCallback(() => setSelectedElement(null), []);
+
+    /** Note vocale rattachée à un repère : sortie dédiée, horodatée. */
+    const emitVoiceNote = useCallback((text: string, zoneLabel: string, liaisonName: string) => {
+        if (!onOutputChange) return;
+        onOutputChange('VoiceNoteJSON', JSON.stringify({
+            text,
+            zoneLabel,
+            liaison: liaisonName,
+            createdAt: new Date().toISOString(),
+        }));
+    }, [onOutputChange]);
+
+    /** Entrée dans le schéma unifilaire. Le retour au menu remet le trigger à
+     *  false, sinon Power Apps ne verrait plus de changement à l'entrée suivante. */
+    const openSchemaView = () => {
+        setCurrentView('schema');
+        onOutputChange?.('SchemaNavTrigger', true);
+    };
+
+    const backToMenu = () => {
+        setCurrentView('menu');
+        onOutputChange?.('SchemaNavTrigger', false);
+    };
+
+    const handlePhotoTrigger = (zoneLabel?: string, liaisonName?: string) => {
+        setPhotoContext({ zoneLabel: zoneLabel ?? 'general', liaisonName: liaisonName ?? '' });
         setIsPhotoOpen(true);
         if (onOutputChange) {
             onOutputChange('PhotoTrigger', true);
@@ -221,7 +277,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
     }
 
     const isMobile = breakpoint === 'mobile';
-    const hasSchema = !!schemaData?.ordreSchema?.trim();
+    const hasSchema = liaisons.length > 0;
     const pmInitials = project.PM
         ? project.PM.split(' ').map((w: string) => w[0] ?? '').join('').slice(0, 2).toUpperCase()
         : '?';
@@ -231,22 +287,22 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
             {currentView === 'schema' ? (
                 <div className="relative w-full h-full">
                     <SchemaView
-                        schemaData={schemaData}
-                        onBack={() => setCurrentView('menu')}
+                        liaisons={liaisons}
+                        jsonSchemaError={jsonSchemaError}
+                        bottomSafeArea={bottomSafeArea}
+                        projectTitle={projectTitle}
+                        sharepointUrl={sharepointUrl}
+                        captureImage={captureImage}
+                        point5MinDone={point5MinDoneToday}
+                        onOpenPoint5Min={() => setIsPoint5MinOpen(true)}
+                        onBack={backToMenu}
                         onElementClick={(element) => setSelectedElement(element)}
                         selectedElement={selectedElement}
-                        onCloseModal={() => setSelectedElement(null)}
-                        onPhotoTrigger={(zoneLabel) => handlePhotoTrigger(zoneLabel)}
+                        onCloseModal={closeElementSheet}
+                        onPhotoUpload={emitPhotoPayload}
+                        onVoiceNote={emitVoiceNote}
+                        t={tr}
                     />
-                    {!point5MinDoneToday && !isPoint5MinOpen && (
-                        <div className="absolute left-0 right-0" style={{ top: '72px', zIndex: 20 }}>
-                            <Point5MinNotification
-                                projectTitle={projectTitle}
-                                onOpen={() => setIsPoint5MinOpen(true)}
-                                t={tr}
-                            />
-                        </div>
-                    )}
                 </div>
             ) : (
                 <div
@@ -326,7 +382,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
 
                     <div className="mx-4 bg-white rounded-[20px] overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.07)] flex-shrink-0">
                         <button
-                            onClick={() => setCurrentView('schema')}
+                            onClick={openSchemaView}
                             className="w-full flex items-center gap-4 px-5 py-[18px] active:bg-gray-50 transition-all text-left"
                         >
                             <div className="w-[52px] h-[52px] rounded-[14px] bg-[#FEE8EC] flex items-center justify-center flex-shrink-0">
@@ -435,19 +491,8 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
                     setIsPhotoOpen(false);
                 }}
                 onPhotoCapture={(base64ArrayJson) => {
-                    if (onOutputChange) {
-                        const photos: string[] = JSON.parse(base64ArrayJson) as string[];
-                        const isGeneral = photoContext === 'general';
-                        const payload: PhotoPayloadItem[] = photos.map((b64) => ({
-                            base64: stripDataUri(b64),   // base64 pur sans préfixe data URI
-                            fileName: generatePhotoFileName(photoContext),
-                            photoType: isGeneral ? 'general' : 'schema',
-                            zoneLabel: photoContext,
-                        }));
-                        onOutputChange('PhotoPayloadJSON', JSON.stringify(payload));
-                        onOutputChange('PhotoBase64', base64ArrayJson);
-                        onOutputChange('PhotoTrigger', true);
-                    }
+                    const photos: string[] = JSON.parse(base64ArrayJson) as string[];
+                    emitPhotoPayload(photos, photoContext.zoneLabel, photoContext.liaisonName);
                 }}
                 t={tr}
             />

@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "liaisons": [
+    {
+      "comment": "Liaison LSA",
+      "ordreSchema": "2,3",
+      "elements": [
+        { "type": "termination", "subtype": "nzo", "orientation": "right", "label": "Transfo LSA" },
+        { "type": "termination", "subtype": "droite_directe", "orientation": "left", "label": "Cellule LSA" }
+      ]
+    },
+    {
+      "comment": "Liaison LSB",
+      "ordreSchema": "2,3",
+      "elements": [
+        { "type": "termination", "subtype": "nzo", "orientation": "right", "label": "Transfo LSB" },
+        { "type": "termination", "subtype": "droite_directe", "orientation": "left", "label": "Cellule LSB" }
+      ]
+    }
+  ]
+}

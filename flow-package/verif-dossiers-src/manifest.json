@@ -1,0 +1,47 @@
+{
+  "schema": "1.0",
+  "details": {
+    "displayName": "VerifierDossiersSchema",
+    "description": "Vérifie et crée les dossiers manquants (par élément de schéma) sous 6. Tablette pour un projet donné.",
+    "createdTime": "2026-07-22T00:00:00.0000000Z",
+    "packageTelemetryId": "63ce2884-61f0-41d4-b15e-64cf48f0c915",
+    "creator": "N/A",
+    "sourceEnvironment": ""
+  },
+  "resources": {
+    "9dfc086d-95ab-4a2f-abdb-b8512ac068a6": {
+      "type": "Microsoft.Flow/flows",
+      "suggestedCreationType": "New",
+      "creationType": "Existing, New, Update",
+      "details": { "displayName": "VerifierDossiersSchema" },
+      "configurableBy": "User",
+      "hierarchy": "Root",
+      "dependsOn": ["52aede0b-c702-432b-b39f-f5f3cc290ca4", "32d70859-dfe6-4a4d-acfc-ee3d46611892"]
+    },
+    "52aede0b-c702-432b-b39f-f5f3cc290ca4": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+      "name": "shared_sharepointonline",
+      "type": "Microsoft.PowerApps/apis",
+      "suggestedCreationType": "Existing",
+      "details": {
+        "displayName": "SharePoint",
+        "iconUri": "https://static.powerapps.com/resource/ppcr/releases/v1.0.1813/1.0.1813.4743/sharepointonline/icon.png"
+      },
+      "configurableBy": "System",
+      "hierarchy": "Child",
+      "dependsOn": []
+    },
+    "32d70859-dfe6-4a4d-acfc-ee3d46611892": {
+      "type": "Microsoft.PowerApps/apis/connections",
+      "suggestedCreationType": "Existing",
+      "creationType": "Existing",
+      "details": {
+        "displayName": "SharePoint",
+        "iconUri": "https://static.powerapps.com/resource/ppcr/releases/v1.0.1813/1.0.1813.4743/sharepointonline/icon.png"
+      },
+      "configurableBy": "User",
+      "hierarchy": "Child",
+      "dependsOn": ["52aede0b-c702-432b-b39f-f5f3cc290ca4"]
+    }
+  }
+}

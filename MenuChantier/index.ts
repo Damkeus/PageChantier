@@ -2,12 +2,31 @@ import { IInputs, IOutputs } from "./generated/ManifestTypes";
 import * as React from "react";
 import * as ReactDOM from "react-dom";
 import App from "./App";
+import { NativeCameraCapture } from "./SchemaComponents";
+
+/** Caméra native de l'app mobile Power Apps : sa WebView ignore l'attribut
+ *  capture de <input type="file"> et ouvre la galerie. Hors app mobile,
+ *  on laisse l'input HTML gérer l'appareil photo. */
+function buildNativeCamera(context: ComponentFramework.Context<IInputs>): NativeCameraCapture | undefined {
+    if (context.client.getClient() !== "Mobile" || typeof context.device?.captureImage !== "function") {
+        return undefined;
+    }
+    return async () => {
+        const file = await context.device.captureImage();
+        if (!file?.fileContent) return null;
+        const base64 = file.fileContent.startsWith("data:")
+            ? file.fileContent
+            : `data:${file.mimeType || "image/jpeg"};base64,${file.fileContent}`;
+        return { base64, name: file.fileName || "photo.jpg" };
+    };
+}
 
 export class MenuChantier implements ComponentFramework.StandardControl<IInputs, IOutputs> {
     private _container: HTMLDivElement | null = null;
     private _notifyOutputChanged!: () => void;
     private _props: { projectJSON?: string; jsonSchema?: string } = {};
     private _outputs: IOutputs = {};
+    private _captureImage?: NativeCameraCapture;
 
 
 
@@ -22,6 +41,7 @@ export class MenuChantier implements ComponentFramework.StandardControl<IInputs,
     public init(context: ComponentFramework.Context<IInputs>, notifyOutputChanged: () => void, state: ComponentFramework.Dictionary, container: HTMLDivElement): void {
         this._notifyOutputChanged = notifyOutputChanged;
         this._container = container;
+        this._captureImage = buildNativeCamera(context);
 
         // Add full height to container
         if (this._container) {
@@ -45,13 +65,26 @@ export class MenuChantier implements ComponentFramework.StandardControl<IInputs,
         const jsonSchema = context.parameters.JSONSchema.raw ?? undefined;
         const language = context.parameters.Language.raw ?? undefined;
         const currentUserName = context.parameters.CurrentUserName?.raw ?? undefined;
+        // La barre de navigation d'un autre PCF recouvre le bas du contrôle :
+        // on réserve sa hauteur pour que rien n'y passe dessous.
+        const bottomSafeArea = context.parameters.BottomSafeArea?.raw ?? 70;
+        const sharepointUrl = context.parameters.SharepointUrl?.raw ?? undefined;
 
         const onOutputChange = (key: string, value: string | boolean): void => {
             (this._outputs as Record<string, string | boolean>)[key] = value;
             this._notifyOutputChanged();
         };
 
-        const props = { projectJSON, jsonSchema, language, currentUserName, onOutputChange };
+        const props = {
+            projectJSON,
+            jsonSchema,
+            language,
+            currentUserName,
+            bottomSafeArea,
+            sharepointUrl,
+            captureImage: this._captureImage,
+            onOutputChange,
+        };
 
         ReactDOM.render(
             React.createElement(App, props),

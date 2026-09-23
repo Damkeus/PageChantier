@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { type TranslationKey } from './i18n';
+import { ChevronUp, ChevronDown } from './Icons';
 
 // =============================================
 // TYPES
@@ -149,30 +150,54 @@ const VoiceField: React.FC<VoiceFieldProps> = ({ label, placeholder, value, onCh
 // NOTIFICATION BANNER (swipe-to-dismiss)
 // =============================================
 
+/**
+ * Barre ancrée en bas, repliée par défaut. Elle vivait en overlay `absolute`
+ * au-dessus du schéma et recouvrait la navigation des liaisons ; en flux et en
+ * bas, elle ne peut plus masquer quoi que ce soit.
+ */
 export const Point5MinNotification: React.FC<Point5MinNotificationProps> = ({ onOpen, t }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+
     return (
         <div
             style={{ fontFamily: "'DM Sans', sans-serif" }}
-            className="mx-4 mb-4 bg-white rounded-[20px] shadow-[0_2px_16px_rgba(196,18,48,0.15)] border border-[#FEE8EC] overflow-hidden flex-shrink-0"
+            className="bg-white border-t border-[#FEE8EC] shadow-[0_-2px_20px_rgba(196,18,48,0.12)] flex-shrink-0"
         >
-            <div className="flex items-center gap-3 px-4 py-4">
-                <div className="w-11 h-11 rounded-[14px] bg-[#FEE8EC] flex items-center justify-center flex-shrink-0">
+            <button
+                type="button"
+                onClick={() => setIsExpanded((v) => !v)}
+                aria-expanded={isExpanded}
+                className="w-full flex items-center gap-3.5 px-5 py-3.5 text-left active:bg-gray-50 transition-colors"
+            >
+                <div className="w-10 h-10 rounded-[12px] bg-[#FEE8EC] flex items-center justify-center flex-shrink-0">
                     <svg className="w-5 h-5 text-[#C41230]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10" />
                         <polyline points="12 6 12 12 16 14" />
                     </svg>
                 </div>
                 <div className="flex-1 min-w-0">
-                    <div className="text-[14px] font-bold text-[#111]">{t('point5min_title')}</div>
-                    <div className="text-[12px] text-[#888]">{t('daily_not_done')}</div>
+                    <div className="text-[15px] font-bold text-[#111]">{t('point5min_title')}</div>
+                    <div className="text-[13px] text-[#888]">{t('daily_not_done')}</div>
+                </div>
+                {isExpanded
+                    ? <ChevronDown className="w-6 h-6 text-gray-400 flex-shrink-0" />
+                    : <ChevronUp className="w-6 h-6 text-gray-400 flex-shrink-0" />}
+            </button>
+
+            {/* max-height : compositor-friendly, pas de reflow de la colonne */}
+            <div
+                className="overflow-hidden transition-[max-height] duration-200 ease-out"
+                style={{ maxHeight: isExpanded ? 96 : 0 }}
+            >
+                <div className="px-5 pb-4">
+                    <button
+                        onClick={onOpen}
+                        className="w-full h-14 bg-[#C41230] hover:bg-[#a80f28] active:opacity-90 text-white text-[16px] font-semibold rounded-xl transition-all"
+                    >
+                        {t('start_briefing')}
+                    </button>
                 </div>
             </div>
-            <button
-                onClick={onOpen}
-                className="w-full bg-[#C41230] hover:bg-[#a80f28] active:opacity-90 text-white text-[14px] font-semibold py-3 transition-all"
-            >
-                {t('start_briefing')}
-            </button>
         </div>
     );
 };
