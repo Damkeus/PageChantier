@@ -3,6 +3,7 @@ import * as React from "react";
 import * as ReactDOM from "react-dom";
 import App from "./App";
 import { NativeCameraCapture } from "./SchemaComponents";
+import { readExifTakenAt } from "./exifDate";
 
 /** Caméra native de l'app mobile Power Apps : sa WebView ignore l'attribut
  *  capture de <input type="file"> et ouvre la galerie. Hors app mobile,
@@ -17,7 +18,11 @@ function buildNativeCamera(context: ComponentFramework.Context<IInputs>): Native
         const base64 = file.fileContent.startsWith("data:")
             ? file.fileContent
             : `data:${file.mimeType || "image/jpeg"};base64,${file.fileContent}`;
-        return { base64, name: file.fileName || "photo.jpg" };
+        return {
+            base64,
+            name: file.fileName || "photo.jpg",
+            takenAt: readExifTakenAt(base64) ?? Date.now(),
+        };
     };
 }
 

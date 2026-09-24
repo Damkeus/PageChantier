@@ -38,28 +38,21 @@
             "schema": {
               "type": "object",
               "properties": {
-                "siteUrl": {
+                "projectFolderPath": {
                   "type": "string",
-                  "description": "URL du site SharePoint (ex: https://contoso.sharepoint.com/sites/chantiers)",
-                  "x-ms-dynamically-added": true,
-                  "x-ms-content-hint": "TEXT"
-                },
-                "projectName": {
-                  "type": "string",
-                  "description": "Nom du projet / chantier",
+                  "description": "ProjectFolderPath du chantier (ex: /Copie RTE ENEDIS/Projet 2026/Urrugne/Arborescence RTE type 2.0)",
                   "x-ms-dynamically-added": true,
                   "x-ms-content-hint": "TEXT"
                 },
                 "photosJson": {
                   "type": "string",
-                  "description": "PhotoPayloadJSON du PCF : [{base64, fileName, photoType, zoneLabel, liaison}]",
+                  "description": "PhotoPayloadJSON du PCF : [{base64, fileName, liaisonFolder, elementFolder, ...}]",
                   "x-ms-dynamically-added": true,
                   "x-ms-content-hint": "TEXT"
                 }
               },
               "required": [
-                "siteUrl",
-                "projectName",
+                "projectFolderPath",
                 "photosJson"
               ]
             }
@@ -67,59 +60,146 @@
         }
       },
       "actions": {
-        "Photos": {
-          "type": "Compose",
-          "inputs": "@json(triggerBody()?['photosJson'])",
+        "Initialiser_varResultat": {
+          "type": "InitializeVariable",
+          "inputs": {
+            "variables": [
+              {
+                "name": "varResultat",
+                "type": "string",
+                "value": "error"
+              }
+            ]
+          },
           "runAfter": {}
         },
-        "Pour_chaque_photo": {
-          "type": "Foreach",
-          "foreach": "@outputs('Photos')",
+        "Photos": {
+          "type": "Compose",
+          "inputs": "@coalesce(json(triggerBody()?['photosJson']), createArray())",
+          "runAfter": {
+            "Initialiser_varResultat": [
+              "Succeeded"
+            ]
+          }
+        },
+        "SegmentsChemin": {
+          "type": "Query",
+          "inputs": {
+            "from": "@split(trim(coalesce(triggerBody()?['projectFolderPath'], '')), '/')",
+            "where": "@not(equals(trim(item()), ''))"
+          },
+          "runAfter": {
+            "Photos": [
+              "Succeeded"
+            ]
+          }
+        },
+        "TablettePath": {
+          "type": "Compose",
+          "inputs": "@concat('/', join(body('SegmentsChemin'), '/'), '/6. Tablette')",
+          "runAfter": {
+            "SegmentsChemin": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Verifier_entrees": {
+          "type": "If",
+          "expression": "@and(greater(length(body('SegmentsChemin')), 0), greater(length(outputs('Photos')), 0))",
           "actions": {
-            "Creer_dossier": {
-              "type": "OpenApiConnection",
-              "inputs": {
-                "host": {
-                  "connectionName": "shared_sharepointonline",
-                  "operationId": "CreateNewFolder",
-                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+            "Pour_chaque_photo": {
+              "type": "Foreach",
+              "foreach": "@outputs('Photos')",
+              "actions": {
+                "LiaisonBrute": {
+                  "type": "Compose",
+                  "inputs": "@trim(coalesce(items('Pour_chaque_photo')?['liaisonFolder'], ''))",
+                  "runAfter": {}
                 },
-                "parameters": {
-                  "dataset": "@triggerBody()?['siteUrl']",
-                  "table": "Documents",
-                  "path": "@concat('Chantiers/', triggerBody()?['projectName'], '/', if(empty(items('Pour_chaque_photo')?['liaison']), 'General', items('Pour_chaque_photo')?['liaison']))"
+                "SafeLiaison": {
+                  "type": "Compose",
+                  "inputs": "@replace(replace(replace(replace(replace(replace(replace(replace(replace(outputs('LiaisonBrute'), '\"', '_'), '*', '_'), ':', '_'), '<', '_'), '>', '_'), '?', '_'), '/', '_'), '\\', '_'), '|', '_')",
+                  "runAfter": {
+                    "LiaisonBrute": [
+                      "Succeeded"
+                    ]
+                  }
                 },
-                "authentication": "@parameters('$authentication')"
+                "ElementBrut": {
+                  "type": "Compose",
+                  "inputs": "@if(equals(trim(coalesce(items('Pour_chaque_photo')?['elementFolder'], '')), ''), 'Général', trim(items('Pour_chaque_photo')?['elementFolder']))",
+                  "runAfter": {
+                    "SafeLiaison": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "SafeElement": {
+                  "type": "Compose",
+                  "inputs": "@replace(replace(replace(replace(replace(replace(replace(replace(replace(outputs('ElementBrut'), '\"', '_'), '*', '_'), ':', '_'), '<', '_'), '>', '_'), '?', '_'), '/', '_'), '\\', '_'), '|', '_')",
+                  "runAfter": {
+                    "ElementBrut": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "DossierCible": {
+                  "type": "Compose",
+                  "inputs": "@concat(outputs('TablettePath'), if(equals(outputs('SafeLiaison'), ''), '', concat('/', outputs('SafeLiaison'))), '/', outputs('SafeElement'))",
+                  "runAfter": {
+                    "SafeElement": [
+                      "Succeeded"
+                    ]
+                  }
+                },
+                "Creer_fichier": {
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_sharepointonline",
+                      "operationId": "CreateFile",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+                    },
+                    "parameters": {
+                      "dataset": "https://nexans.sharepoint.com/sites/t-nex",
+                      "folderPath": "@outputs('DossierCible')",
+                      "name": "@items('Pour_chaque_photo')?['fileName']",
+                      "body": "@base64ToBinary(items('Pour_chaque_photo')?['base64'])"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  },
+                  "runAfter": {
+                    "DossierCible": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "runtimeConfiguration": {
+                "concurrency": {
+                  "repetitions": 5
+                }
               },
               "runAfter": {}
             },
-            "Creer_fichier": {
-              "type": "OpenApiConnection",
+            "Resultat_ok": {
+              "type": "SetVariable",
               "inputs": {
-                "host": {
-                  "connectionName": "shared_sharepointonline",
-                  "operationId": "CreateFile",
-                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
-                },
-                "parameters": {
-                  "dataset": "@triggerBody()?['siteUrl']",
-                  "folderPath": "@concat('Documents/Chantiers/', triggerBody()?['projectName'], '/', if(empty(items('Pour_chaque_photo')?['liaison']), 'General', items('Pour_chaque_photo')?['liaison']))",
-                  "name": "@concat(items('Pour_chaque_photo')?['fileName'], '.jpg')",
-                  "body": "@base64ToBinary(items('Pour_chaque_photo')?['base64'])",
-                  "overwrite": true
-                },
-                "authentication": "@parameters('$authentication')"
+                "name": "varResultat",
+                "value": "ok"
               },
               "runAfter": {
-                "Creer_dossier": [
-                  "Succeeded",
-                  "Failed"
+                "Pour_chaque_photo": [
+                  "Succeeded"
                 ]
               }
             }
           },
+          "else": {
+            "actions": {}
+          },
           "runAfter": {
-            "Photos": [
+            "TablettePath": [
               "Succeeded"
             ]
           }
@@ -130,17 +210,19 @@
           "inputs": {
             "statusCode": 200,
             "body": {
-              "result": "ok",
-              "count": "@{length(outputs('Photos'))}"
+              "result": "@variables('varResultat')",
+              "count": "@{if(equals(variables('varResultat'), 'ok'), length(outputs('Photos')), 0)}"
             },
             "schema": {
               "type": "object",
               "properties": {
                 "result": {
+                  "title": "result",
                   "type": "string",
                   "x-ms-dynamically-added": true
                 },
                 "count": {
+                  "title": "count",
                   "type": "string",
                   "x-ms-dynamically-added": true
                 }
@@ -148,8 +230,11 @@
             }
           },
           "runAfter": {
-            "Pour_chaque_photo": [
-              "Succeeded"
+            "Verifier_entrees": [
+              "Succeeded",
+              "Failed",
+              "Skipped",
+              "TimedOut"
             ]
           }
         }

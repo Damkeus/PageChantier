@@ -2,7 +2,7 @@
   "schema": "1.0",
   "details": {
     "displayName": "EnvoiPhotosChantier",
-    "description": "Recoit les photos du PCF MenuChantier (payload JSON) et les enregistre dans SharePoint sous Chantiers/<projet>/<liaison>.",
+    "description": "Recoit les photos du PCF MenuChantier (payload JSON) et les enregistre dans les dossiers existants <ProjectFolderPath>/6. Tablette/<Liaison>/<Element> (ou .../Général).",
     "createdTime": "2026-07-13T10:00:00.0000000Z",
     "packageTelemetryId": "9fb15b1f-d61c-47ee-95c1-bcc632b49be6",
     "creator": "N/A",

@@ -7,6 +7,10 @@ import { PMNotificationBanner, PMNotificationPanel } from './PMNotificationPanel
 import type { PMNotification } from './PMNotificationPanel';
 import type { Point5MinData } from './Point5MinPanel';
 import { type Lang, type TranslationKey, t, photosTakenLabel, getLangFromProp, LANG_CYCLE } from './i18n';
+import { GENERAL_FOLDER, type PhotoDestination } from './photoFolders';
+import { compressOrKeep } from './imageCompression';
+import { buildPhotoFileNames, userInitials, type TimedPhoto } from './photoNaming';
+import { buildProjectFolderLinks, openFolder } from './sharepointLinks';
 
 // =============================================
 // TYPES
@@ -26,6 +30,8 @@ interface ProjectData {
     PMPhone?: string;
     ProjectUniqID?: string;
     ProjectPath?: string;
+    /** Chemin relatif au site, ex. `/Copie RTE ENEDIS/Projet 2026/…` (ou URL complète). */
+    ProjectFolderPath?: string;
     folderpath?: string;
     FolderPath?: string;
     MonteurMail?: string;
@@ -43,7 +49,7 @@ interface AppProps {
     currentUserName?: string;
     /** Hauteur de la barre de navigation d'un autre PCF posée par-dessus (px). */
     bottomSafeArea?: number;
-    /** Dossier SharePoint du chantier — cible du bouton Notice du schéma. */
+    /** Repli des boutons Documents/Notice quand ProjectJSON n'a pas de chemin de dossier. */
     sharepointUrl?: string;
     /** Caméra native Power Apps (app mobile uniquement). */
     captureImage?: NativeCameraCapture;
@@ -55,26 +61,20 @@ type Breakpoint = 'mobile' | 'tablet' | 'desktop';
 
 interface PhotoPayloadItem {
     base64: string;
+    /** Nom de fichier final, extension comprise. */
     fileName: string;
     photoType: 'general' | 'schema';
     zoneLabel: string;
     liaison: string;
+    /** Dossier de liaison sous `6. Tablette` ('' depuis le menu principal). */
+    liaisonFolder: string;
+    /** Dossier d'élément sous la liaison, ou GENERAL_FOLDER. */
+    elementFolder: string;
 }
 
 interface PhotoContext {
     zoneLabel: string;
     liaisonName: string;
-}
-
-function generatePhotoFileName(prefix: string): string {
-    const timestamp = Math.floor(Date.now() / 1000);
-    const random = Math.floor(Math.random() * 900 + 100);
-    return `${prefix}_${timestamp}_${random}`;
-}
-
-/** Nom de fichier compatible SharePoint (labels type "Transfo LSA" contiennent des espaces). */
-function sanitizeFileNamePart(value: string): string {
-    return value.replace(/[^A-Za-z0-9_-]/g, '_');
 }
 
 /** Retire le préfixe data URI (ex: "data:image/jpeg;base64,") pour Power Automate */
@@ -157,6 +157,15 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
 
     const projectTitle = project?.Title ?? '';
 
+    /** Documents → `6. Tablette`, Notice → `6. Tablette/Notice`. */
+    const folderLinks = useMemo(
+        () => buildProjectFolderLinks(
+            project?.ProjectFolderPath ?? project?.folderpath ?? project?.FolderPath ?? project?.ProjectPath,
+            sharepointUrl,
+        ),
+        [project, sharepointUrl],
+    );
+
     const contacts = useMemo((): ContactData[] => {
         if (!project?.Contact) return [];
         if (Array.isArray(project.Contact)) return project.Contact;
@@ -192,25 +201,42 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
         }
     };
 
-    /** Construit et émet le payload photo (capture caméra ou upload fichier). */
-    const emitPhotoPayload = useCallback((photos: string[], zoneLabel: string, liaisonName: string) => {
+    const initials = useMemo(() => userInitials(currentUserName), [currentUserName]);
+
+    /** Compresse puis émet le payload photo. PhotoSendTimestamp change à chaque
+     *  validation : c'est lui qui déclenche EnvoiPhotosChantier.Run() dans OnChange. */
+    const emitPhotoPayload = useCallback(async (photos: TimedPhoto[], destination: PhotoDestination) => {
         if (!onOutputChange) return;
+        const { zoneLabel, liaisonName, liaisonFolder, elementFolder } = destination;
         const isGeneral = zoneLabel === 'general';
         const finalZoneLabel = liaisonName ? `${liaisonName} - ${zoneLabel}` : zoneLabel;
-        const fileNamePrefix = sanitizeFileNamePart(
-            [liaisonName, zoneLabel].filter(Boolean).join('_')
+        const compressed = await Promise.all(photos.map((photo) => compressOrKeep(photo.base64)));
+        const fileNames = buildPhotoFileNames(
+            [liaisonName, zoneLabel].filter(Boolean).join('_'),
+            initials,
+            compressed.map(({ ext }, i) => ({ ext, takenAt: photos[i].takenAt })),
         );
-        const payload: PhotoPayloadItem[] = photos.map((b64) => ({
-            base64: stripDataUri(b64),   // base64 pur sans préfixe data URI
-            fileName: generatePhotoFileName(fileNamePrefix),
+        const payload: PhotoPayloadItem[] = compressed.map(({ dataUrl }, i) => ({
+            base64: stripDataUri(dataUrl),   // base64 pur sans préfixe data URI
+            fileName: fileNames[i],
             photoType: isGeneral ? 'general' : 'schema',
             zoneLabel: finalZoneLabel,
             liaison: liaisonName,
+            liaisonFolder,
+            elementFolder,
         }));
         onOutputChange('PhotoPayloadJSON', JSON.stringify(payload));
-        onOutputChange('PhotoBase64', JSON.stringify(photos));
+        onOutputChange('PhotoBase64', JSON.stringify(compressed.map((p) => p.dataUrl)));
         onOutputChange('PhotoTrigger', true);
-    }, [onOutputChange]);
+        onOutputChange('PhotoSendTimestamp', new Date().toISOString());
+    }, [onOutputChange, initials]);
+
+    /** Rappel synchrone pour les composants : l'échec est journalisé, jamais avalé. */
+    const handlePhotoUpload = useCallback((photos: TimedPhoto[], destination: PhotoDestination) => {
+        emitPhotoPayload(photos, destination).catch((error: unknown) => {
+            console.error('[MenuChantier] Préparation des photos impossible.', error);
+        });
+    }, [emitPhotoPayload]);
 
     /** Référence stable : SchemaView la rappelle depuis un effet. */
     const closeElementSheet = useCallback(() => setSelectedElement(null), []);
@@ -291,7 +317,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
                         jsonSchemaError={jsonSchemaError}
                         bottomSafeArea={bottomSafeArea}
                         projectTitle={projectTitle}
-                        sharepointUrl={sharepointUrl}
+                        noticeUrl={folderLinks.notice}
                         captureImage={captureImage}
                         point5MinDone={point5MinDoneToday}
                         onOpenPoint5Min={() => setIsPoint5MinOpen(true)}
@@ -299,7 +325,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
                         onElementClick={(element) => setSelectedElement(element)}
                         selectedElement={selectedElement}
                         onCloseModal={closeElementSheet}
-                        onPhotoUpload={emitPhotoPayload}
+                        onPhotoUpload={handlePhotoUpload}
                         onVoiceNote={emitVoiceNote}
                         t={tr}
                     />
@@ -412,14 +438,7 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
 
                     <div className="grid grid-cols-3 gap-3 px-4 pb-6 flex-shrink-0">
                         <button
-                            onClick={() => {
-                                const url = project.folderpath ?? project.FolderPath ?? project.ProjectPath;
-                                if (url) {
-                                    window.open(url, '_blank');
-                                } else {
-                                    console.warn('No folderpath found in project JSON');
-                                }
-                            }}
+                            onClick={() => openFolder(folderLinks.tablette, tr('documents'))}
                             className="bg-white rounded-[20px] px-3 py-5 flex flex-col items-center gap-[10px] shadow-[0_2px_12px_rgba(0,0,0,0.07)] active:scale-[0.96] transition-all border-none"
                         >
                             <div className="w-[52px] h-[52px] rounded-[16px] bg-[#FEE8EC] flex items-center justify-center">
@@ -490,9 +509,14 @@ const App: React.FC<AppProps> = ({ projectJSON, jsonSchema, language, currentUse
                 onClose={() => {
                     setIsPhotoOpen(false);
                 }}
-                onPhotoCapture={(base64ArrayJson) => {
-                    const photos: string[] = JSON.parse(base64ArrayJson) as string[];
-                    emitPhotoPayload(photos, photoContext.zoneLabel, photoContext.liaisonName);
+                onPhotoCapture={(photos) => {
+                    // Menu principal : pas de liaison, sous-dossier Général de 6. Tablette.
+                    handlePhotoUpload(photos, {
+                        zoneLabel: photoContext.zoneLabel,
+                        liaisonName: photoContext.liaisonName,
+                        liaisonFolder: '',
+                        elementFolder: GENERAL_FOLDER,
+                    });
                 }}
                 t={tr}
             />
@@ -751,7 +775,7 @@ const RapportPanel: React.FC<RapportPanelProps> = ({ isOpen, onClose, onSubmit, 
 interface PhotoPanelProps {
     isOpen: boolean;
     onClose: () => void;
-    onPhotoCapture: (base64: string) => void;
+    onPhotoCapture: (photos: TimedPhoto[]) => void;
     t: (key: TranslationKey) => string;
 }
 
@@ -759,7 +783,7 @@ const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
-    const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
+    const [capturedPhotos, setCapturedPhotos] = useState<TimedPhoto[]>([]);
     const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -814,7 +838,7 @@ const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture
 
         ctx.drawImage(video, 0, 0);
         const base64 = canvas.toDataURL('image/jpeg', 0.8);
-        setCapturedPhotos(prev => [...prev, base64]);
+        setCapturedPhotos(prev => [...prev, { base64, takenAt: Date.now() }]);
     }, []);
 
     const handleDelete = useCallback((index: number) => {
@@ -824,7 +848,7 @@ const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture
 
     const handleValidate = useCallback(() => {
         if (capturedPhotos.length === 0) return;
-        onPhotoCapture(JSON.stringify(capturedPhotos));
+        onPhotoCapture(capturedPhotos);
         onClose();
     }, [capturedPhotos, onPhotoCapture, onClose]);
 
@@ -900,7 +924,7 @@ const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture
                                             </svg>
                                         </button>
                                         <img
-                                            src={capturedPhotos[selectedIndex]}
+                                            src={capturedPhotos[selectedIndex].base64}
                                             alt={`Photo ${selectedIndex + 1}`}
                                             className="flex-1 object-contain w-full"
                                         />
@@ -922,7 +946,7 @@ const PhotoPanel: React.FC<PhotoPanelProps> = ({ isOpen, onClose, onPhotoCapture
                             {/* Thumbnail strip — visible once at least 1 photo captured */}
                             {capturedPhotos.length > 0 && (
                                 <div className="flex gap-2 overflow-x-auto flex-shrink-0 pb-1" style={{ scrollbarWidth: 'none' }}>
-                                    {capturedPhotos.map((src, idx) => (
+                                    {capturedPhotos.map(({ base64: src }, idx) => (
                                         <button
                                             key={idx}
                                             onClick={() => setSelectedIndex(idx)}

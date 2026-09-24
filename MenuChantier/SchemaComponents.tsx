@@ -2,6 +2,12 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, X, FileCheck, Camera, Mic, Clock, ChevronLeft, ChevronRight, Gallery } from './Icons';
 import * as assets from './assets/assets';
 import { TranslationKey } from './i18n';
+import { GENERAL_FOLDER, elementFolderName, liaisonFolderName } from './photoFolders';
+import type { PhotoDestination } from './photoFolders';
+import type { TimedPhoto } from './photoNaming';
+import { readExifTakenAt } from './exifDate';
+import { useCameraLauncher } from './WebcamCapture';
+import { openFolder } from './sharepointLinks';
 
 // =============================================
 // TYPES & INTERFACES
@@ -13,6 +19,8 @@ export interface SchemaElement {
     label: string;
     assetImg: string;
     mirrored?: boolean;
+    /** Dossier SharePoint des photos de ce repère (sous le dossier de liaison). */
+    folderName: string;
 }
 
 export interface SchemaData {
@@ -42,6 +50,8 @@ interface LiaisonJson {
 /** Modèle normalisé consommé par la vue schéma : éléments déjà résolus. */
 export interface Liaison {
     name: string;
+    /** Dossier SharePoint de la liaison sous `6. Tablette` ('' en legacy). */
+    folderName: string;
     elements: SchemaElement[];
 }
 
@@ -98,7 +108,7 @@ const parseOrdreSchema = (ordreSchemaString: string): SchemaElement[] => {
         const trimmed = idStr.trim();
 
         if (trimmed === '') {
-            elements.push({ id: -index, type: 'empty', label: '', assetImg: '' });
+            elements.push({ id: -index, type: 'empty', label: '', assetImg: '', folderName: '' });
             return;
         }
 
@@ -112,13 +122,16 @@ const parseOrdreSchema = (ordreSchemaString: string): SchemaElement[] => {
         const mapping = ID_TO_TYPE_MAP[numericId];
         const labelPrefix = numericId <= 3 ? 'E' : 'J';
         const isFirst = elements.filter(e => e.type !== 'empty').length === 0;
+        const label = `${labelPrefix}${index + 1}`;
 
         elements.push({
             id: numericId * 100 + index,
             type: mapping.name,
-            label: `${labelPrefix}${index + 1}`,
+            label,
             assetImg: mapping.asset,
             mirrored: isFirst,
+            // Aucun dossier n'est créé pour le CSV legacy : le label sert de nom.
+            folderName: label,
         });
     });
 
@@ -149,13 +162,19 @@ const numericIdForElement = (el: LiaisonElementJson): number => {
  * tableau fait foi et est préservé tel quel.
  */
 const parseLiaisonElements = (rawElements: LiaisonElementJson[]): SchemaElement[] => {
+    // Le dossier est nommé d'après la position BRUTE : VerifierDossiersSchema
+    // ne trie pas, lui. On la fige donc avant le tri de migration v1.
+    const withFolders = rawElements.map((el, rawIndex) => ({
+        el,
+        folderName: elementFolderName(el.type, rawIndex, el.label),
+    }));
     const isV1 = rawElements.length > 0 && rawElements.every((e) => typeof e.x === 'number');
     const ordered = isV1
-        ? [...rawElements].sort((a, b) => a.x! - b.x!)
-        : rawElements;
+        ? [...withFolders].sort((a, b) => a.el.x! - b.el.x!)
+        : withFolders;
 
     const elements: SchemaElement[] = [];
-    ordered.forEach((el, index) => {
+    ordered.forEach(({ el, folderName }, index) => {
         const numericId = numericIdForElement(el);
         const mapping = ID_TO_TYPE_MAP[numericId];
         if (!mapping) {
@@ -176,6 +195,7 @@ const parseLiaisonElements = (rawElements: LiaisonElementJson[]): SchemaElement[
             label: customLabel ?? `${labelPrefix}${index + 1}`,
             assetImg: mapping.asset,
             mirrored: hasOrientation ? el.orientation === 'right' : elements.length === 0,
+            folderName,
         });
     });
 
@@ -223,10 +243,11 @@ const extractEnvelopeLiaisons = (parsed: unknown): LiaisonJson[] | null => {
  */
 /** Enveloppe → liaisons d'affichage, quelle que soit la propriété source. */
 const buildLiaisons = (envelopeLiaisons: LiaisonJson[]): Liaison[] =>
-    envelopeLiaisons.map((l) => {
+    envelopeLiaisons.map((l, index) => {
         const rawElements = Array.isArray(l.elements) ? l.elements : [];
         return {
             name: (l.comment ?? '').trim(),
+            folderName: liaisonFolderName(l.comment, index),
             elements: rawElements.length > 0
                 ? parseLiaisonElements(rawElements)
                 : parseOrdreSchema(l.ordreSchema ?? ''),
@@ -270,7 +291,7 @@ export const normalizeSchemaInput = (
 
     if (legacyOrdreSchema?.trim()) {
         return {
-            liaisons: [{ name: '', elements: parseOrdreSchema(legacyOrdreSchema) }],
+            liaisons: [{ name: '', folderName: '', elements: parseOrdreSchema(legacyOrdreSchema) }],
             source: 'legacy-csv',
             jsonSchemaError: error,
         };
@@ -279,7 +300,7 @@ export const normalizeSchemaInput = (
     const legacy = parsed as SchemaData | null;
     if (legacy && typeof legacy.ordreSchema === 'string' && legacy.ordreSchema.trim()) {
         return {
-            liaisons: [{ name: '', elements: parseOrdreSchema(legacy.ordreSchema) }],
+            liaisons: [{ name: '', folderName: '', elements: parseOrdreSchema(legacy.ordreSchema) }],
             source: 'legacy-json',
             jsonSchemaError: error,
         };
@@ -292,33 +313,15 @@ export const normalizeSchemaInput = (
 // PHOTOS — helpers partagés
 // =============================================
 
-export interface UploadedPhoto {
-    base64: string;
+export interface UploadedPhoto extends TimedPhoto {
     name: string;
 }
 
 /** Caméra native Power Apps (context.device.captureImage) ; null si annulée. */
 export type NativeCameraCapture = () => Promise<UploadedPhoto | null>;
 
-/** Ouvre l'appareil photo. La WebView Power Apps ignore capture="environment"
- *  et ouvre la galerie : on passe par l'API native quand elle est fournie. */
-const openCamera = (
-    nativeCamera: NativeCameraCapture | undefined,
-    fallbackInput: HTMLInputElement | null,
-    onPhotos: (photos: UploadedPhoto[]) => void,
-): void => {
-    if (!nativeCamera) {
-        fallbackInput?.click();
-        return;
-    }
-    nativeCamera()
-        .then((photo) => (photo ? onPhotos([photo]) : undefined))
-        .catch((error: unknown) => {
-            console.warn('[MenuChantier] Capture photo annulée ou impossible.', error);
-        });
-};
-
-/** Lit une sélection de fichiers en data URLs, dans l'ordre de la sélection. */
+/** Lit une sélection de fichiers en data URLs, dans l'ordre de la sélection.
+ *  Heure de prise de vue : EXIF, sinon date du fichier. */
 const readFilesAsDataUrls = (fileList: FileList, done: (photos: UploadedPhoto[]) => void): void => {
     const files = Array.from(fileList);
     const results: UploadedPhoto[] = [];
@@ -329,7 +332,11 @@ const readFilesAsDataUrls = (fileList: FileList, done: (photos: UploadedPhoto[])
         reader.onloadend = () => {
             const result = reader.result;
             if (typeof result === 'string') {
-                results[index] = { base64: result, name: file.name };
+                results[index] = {
+                    base64: result,
+                    name: file.name,
+                    takenAt: readExifTakenAt(result) ?? file.lastModified,
+                };
             }
             pending -= 1;
             if (pending === 0) done(results.filter(Boolean));
@@ -352,8 +359,8 @@ interface SchemaViewProps {
     bottomSafeArea?: number;
     /** Titre du chantier, affiché sous le titre de la vue. */
     projectTitle?: string;
-    /** Dossier SharePoint du chantier — cible du bouton Notice. */
-    sharepointUrl?: string;
+    /** Dossier `6. Tablette/Notice` du chantier — cible des boutons Notice. */
+    noticeUrl?: string | null;
     /** Caméra native Power Apps ; à défaut, input capture="environment". */
     captureImage?: NativeCameraCapture;
     /** Point 5 min : état du briefing + ouverture depuis le bouton horloge. */
@@ -364,7 +371,7 @@ interface SchemaViewProps {
     selectedElement: SchemaElement | null;
     onCloseModal: () => void;
     onPhotoTrigger?: (zoneLabel: string, liaisonName: string) => void;
-    onPhotoUpload?: (base64List: string[], zoneLabel: string, liaisonName: string) => void;
+    onPhotoUpload?: (photos: UploadedPhoto[], destination: PhotoDestination) => void;
     /** Note vocale validée : texte dicté rattaché à un repère. */
     onVoiceNote?: (text: string, zoneLabel: string, liaisonName: string) => void;
     t: (key: TranslationKey) => string;
@@ -374,6 +381,7 @@ interface SchemaViewProps {
 interface PhotoTarget {
     zone: string;
     liaisonName: string;
+    liaisonFolder: string;
     /** Clichés déjà choisis depuis la feuille du repère, à relire avant envoi. */
     initialPhotos: UploadedPhoto[];
 }
@@ -390,7 +398,7 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
     jsonSchemaError,
     bottomSafeArea = 0,
     projectTitle,
-    sharepointUrl,
+    noticeUrl,
     captureImage,
     point5MinDone,
     onOpenPoint5Min,
@@ -432,6 +440,7 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
     const elements = activeLiaison?.elements ?? [];
     const visibleElements = elements.filter((e) => e.type !== 'empty');
     const liaisonName = activeLiaison?.name ?? '';
+    const liaisonFolder = activeLiaison?.folderName ?? '';
     const showStepper = liaisons.length > 1 || Boolean(liaisons[0]?.name);
 
     /** Fenêtre visible de la bande — alimente les tirets de la vue d'ensemble. */
@@ -457,19 +466,13 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
         setActiveIdx((i) => Math.min(liaisons.length - 1, Math.max(0, i + direction)));
     };
 
-    const openNotice = () => {
-        if (!sharepointUrl) {
-            console.warn('[MenuChantier] Aucune SharepointUrl fournie — Notice sans cible.');
-            return;
-        }
-        window.open(sharepointUrl, '_blank', 'noopener');
-    };
+    const openNotice = () => openFolder(noticeUrl ?? null, t('notice'));
 
     /** Depuis une tuile du repère : les fichiers sont déjà choisis, on passe
      *  à la relecture avant envoi vers le flux SharePoint. */
     const handleSheetCapture = (zone: string, captured: UploadedPhoto[]) => {
         onCloseModal();
-        setPhotoTarget({ zone, liaisonName, initialPhotos: captured });
+        setPhotoTarget({ zone, liaisonName, liaisonFolder, initialPhotos: captured });
         onPhotoTrigger?.(zone, liaisonName);
     };
 
@@ -661,7 +664,7 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
                     <div className="flex gap-2.5">
                         {onPhotoUpload && (
                             <button
-                                onClick={() => setPhotoTarget({ zone: 'general', liaisonName, initialPhotos: [] })}
+                                onClick={() => setPhotoTarget({ zone: 'general', liaisonName, liaisonFolder, initialPhotos: [] })}
                                 className="flex-1 h-[62px] flex items-center justify-center gap-2.5 rounded-2xl bg-nexans active:bg-nexans-dark text-white text-[17px] font-bold transition-colors"
                             >
                                 <Camera className="w-6 h-6" />
@@ -702,6 +705,7 @@ export const SchemaView: React.FC<SchemaViewProps> = ({
                 <SchemaPhotoUpload
                     elements={visibleElements}
                     liaisonName={photoTarget.liaisonName}
+                    liaisonFolder={photoTarget.liaisonFolder}
                     initialZone={photoTarget.zone}
                     initialPhotos={photoTarget.initialPhotos}
                     bottomSafeArea={bottomSafeArea}
@@ -761,6 +765,7 @@ const ElementSheet: React.FC<ElementSheetProps> = ({
 }) => {
     const galleryInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
+    const { openCamera, cameraOverlay } = useCameraLauncher(captureImage, cameraInputRef, onCapture, t);
     const tile = 'h-24 flex flex-col items-center justify-center gap-2 rounded-2xl text-[15px] font-bold transition-all';
 
     // Le clic sur l'input part du geste utilisateur lui-même : un .click()
@@ -832,7 +837,7 @@ const ElementSheet: React.FC<ElementSheetProps> = ({
 
                 <div className="grid grid-cols-2 gap-2.5">
                     <button
-                        onClick={() => openCamera(captureImage, cameraInputRef.current, onCapture)}
+                        onClick={openCamera}
                         className={`${tile} bg-nexans active:bg-nexans-dark text-white`}
                     >
                         <Camera className="w-7 h-7" />
@@ -855,6 +860,7 @@ const ElementSheet: React.FC<ElementSheetProps> = ({
                     </button>
                 </div>
             </div>
+            {cameraOverlay}
         </div>
     );
 };
@@ -1020,12 +1026,13 @@ const VoiceNoteSheet: React.FC<VoiceNoteSheetProps> = ({ zoneLabel, liaisonName,
 interface SchemaPhotoUploadProps {
     elements: SchemaElement[];
     liaisonName: string;
+    liaisonFolder: string;
     initialZone: string;
     /** Clichés déjà choisis en amont (tuile Photo / Galerie du repère). */
     initialPhotos: UploadedPhoto[];
     bottomSafeArea: number;
     captureImage?: NativeCameraCapture;
-    onUpload: (base64List: string[], zoneLabel: string, liaisonName: string) => void;
+    onUpload: (photos: UploadedPhoto[], destination: PhotoDestination) => void;
     onClose: () => void;
     t: (key: TranslationKey) => string;
 }
@@ -1033,6 +1040,7 @@ interface SchemaPhotoUploadProps {
 const SchemaPhotoUpload: React.FC<SchemaPhotoUploadProps> = ({
     elements,
     liaisonName,
+    liaisonFolder,
     initialZone,
     initialPhotos,
     bottomSafeArea,
@@ -1046,14 +1054,23 @@ const SchemaPhotoUpload: React.FC<SchemaPhotoUploadProps> = ({
     const galleryInputRef = useRef<HTMLInputElement>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
 
+    const addPhotos = (added: UploadedPhoto[]) => setPhotos((prev) => [...prev, ...added]);
+    const { openCamera, cameraOverlay } = useCameraLauncher(captureImage, cameraInputRef, addPhotos, t);
+
     const handleFiles = (fileList: FileList | null) => {
         if (!fileList || fileList.length === 0) return;
-        readFilesAsDataUrls(fileList, (added) => setPhotos((prev) => [...prev, ...added]));
+        readFilesAsDataUrls(fileList, addPhotos);
     };
 
     const handleValidate = () => {
         if (photos.length === 0) return;
-        onUpload(photos.map((p) => p.base64), selectedZone, liaisonName);
+        const element = elements.find((e) => e.label === selectedZone);
+        onUpload(photos, {
+            zoneLabel: selectedZone,
+            liaisonName,
+            liaisonFolder,
+            elementFolder: element?.folderName ?? GENERAL_FOLDER,
+        });
         onClose();
     };
 
@@ -1143,14 +1160,7 @@ const SchemaPhotoUpload: React.FC<SchemaPhotoUploadProps> = ({
                         <Gallery className="w-8 h-8 text-nexans" />
                         <span className="text-[15px] font-bold text-slate2-strong">{t('source_gallery')}</span>
                     </button>
-                    <button
-                        onClick={() =>
-                            openCamera(captureImage, cameraInputRef.current, (added) =>
-                                setPhotos((prev) => [...prev, ...added])
-                            )
-                        }
-                        className={sourceClass}
-                    >
+                    <button onClick={openCamera} className={sourceClass}>
                         <Camera className="w-8 h-8 text-nexans" />
                         <span className="text-[15px] font-bold text-slate2-strong">{t('source_camera')}</span>
                     </button>

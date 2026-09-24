@@ -17,7 +17,7 @@ Cette propriété contient les informations principales du projet affichées sur
   "AddressChantier": "123 Rue de la Sous-Station, 75018 Paris",
   "PM": "Jean Dupont",
   "ProjectUniqID": "PRJ-2023-089",
-  "folderpath": "https://company.sharepoint.com/sites/chantiers/PRJ-2023-089/Documents",
+  "folderpath": "/Copie RTE ENEDIS/Projet 2026/PRJ-2023-089/Arborescence RTE type 2.0",
   "MonteurMail": "monteur.expert@nexans.com",
   "ordreSchema": "1, 2, , 4, 3"
 }
@@ -25,8 +25,19 @@ Cette propriété contient les informations principales du projet affichées sur
 
 ### Valeur à coller dans Power Apps ou dans l'outil de test PCF (Stringifié) :
 ```text
-{"Title":"Chantier Haute Tension - Paris Nord","AddressChantier":"123 Rue de la Sous-Station, 75018 Paris","PM":"Jean Dupont","ProjectUniqID":"PRJ-2023-089","folderpath":"https://company.sharepoint.com/sites/chantiers/PRJ-2023-089/Documents","MonteurMail":"monteur.expert@nexans.com","ordreSchema":"1, 2, , 4, 3"}
+{"Title":"Chantier Haute Tension - Paris Nord","AddressChantier":"123 Rue de la Sous-Station, 75018 Paris","PM":"Jean Dupont","ProjectUniqID":"PRJ-2023-089","folderpath":"/Copie RTE ENEDIS/Projet 2026/PRJ-2023-089/Arborescence RTE type 2.0","MonteurMail":"monteur.expert@nexans.com","ordreSchema":"1, 2, , 4, 3"}
 ```
+
+### Dossier du chantier (boutons Documents et Notice)
+
+Le chemin du dossier projet est lu dans `ProjectJSON`, dans cet ordre : `ProjectFolderPath`, `folderpath`, `FolderPath`, `ProjectPath`.
+C'est le même chemin **relatif au site** que celui des flux photo, par ex. `/Copie RTE ENEDIS/Projet 2026/Urrugne/Arborescence RTE type 2.0`
+(une URL complète `https://…` est aussi acceptée). Le PCF le préfixe par `https://nexans.sharepoint.com/sites/t-nex` (constante de `sharepointLinks.ts`) :
+
+| Bouton | Dossier ouvert |
+|---|---|
+| Documents (accueil) | `<dossier projet>/6. Tablette` |
+| Notice (vue schéma et fiche d'un repère) | `<dossier projet>/6. Tablette/Notice` |
 
 ---
 
@@ -90,7 +101,7 @@ Cette propriété permet de configurer les contacts affichés dans la modale de 
 
 ## 4. `SharepointUrl` (Optionnel)
 
-Cette propriété permet de surcharger ou définir l'URL pour le bouton "Documents" dans le cas où elle ne serait pas fournie dans le `ProjectJSON`.
+Repli des boutons Documents et Notice quand `ProjectJSON` ne fournit aucun chemin de dossier : l'URL est alors ouverte telle quelle.
 
 ### Valeur à coller dans Power Apps ou dans l'outil de test PCF :
 ```text

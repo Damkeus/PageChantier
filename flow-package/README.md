@@ -1,68 +1,96 @@
 # EnvoiPhotosChantier — flux Power Automate + intégration Power Apps
 
-Flux importable qui reçoit le `PhotoPayloadJSON` émis par le PCF MenuChantier et enregistre
-chaque photo dans SharePoint sous `Documents/Chantiers/<projet>/<liaison>/` (ou `General`
-si la photo n'est pas rattachée à une liaison).
+Flux importable qui reçoit le `PhotoPayloadJSON` émis par le PCF MenuChantier (≥ 2.9.0) au clic sur
+**Valider** et dépose chaque photo dans le dossier du repère, **déjà créé** par `VerifierDossiersSchema` :
+
+```
+<ProjectFolderPath>/6. Tablette/<Liaison>/<Élément>/     photo prise sur un repère
+<ProjectFolderPath>/6. Tablette/<Liaison>/Général/       photo « Général » depuis le schéma
+<ProjectFolderPath>/6. Tablette/Général/                 photo depuis le menu principal
+```
+
+Le flux ne crée aucun dossier explicitement. Si un dossier manque (ex. `Général`, ou label renommé
+depuis la création des dossiers), l'action SharePoint *Créer un fichier* le crée à la volée.
 
 ## Import du flux
 
 1. Power Automate → **Mes flux → Importer → Importer un package (hérité)**.
-2. Sélectionner `EnvoiPhotosChantier.zip`.
-3. Sur la ressource *SharePoint*, cliquer **Sélectionner pendant l'importation** et mapper
-   une connexion SharePoint existante.
-4. Importer, puis ouvrir le flux dans le designer pour vérifier qu'aucune action n'affiche
-   d'avertissement.
+2. Sélectionner `EnvoiPhotosChantier.zip`. Si le flux existe déjà, choisir **Mettre à jour** sur la
+   ressource Flow (GUID inchangés).
+3. Sur la ressource *SharePoint*, **Sélectionner pendant l'importation** → connexion SharePoint existante.
+4. Importer, ouvrir le flux dans le designer : aucune action ne doit afficher ⚠.
+5. Dans Power Apps Studio, **retirer puis rajouter** le flux dans le volet Power Automate : la signature
+   du `Run()` a changé (`siteUrl`/`projectName` → `projectFolderPath`).
 
-Entrées du déclencheur (PowerApps V2) :
+Le site `https://nexans.sharepoint.com/sites/t-nex` est en dur dans `Creer_fichier` (comme dans
+`VerifierDossiersSchema`).
 
-| Entrée | Description |
+## Entrées du déclencheur (PowerApps V2)
+
+| Entrée | Source |
 |---|---|
-| `siteUrl` | URL du site SharePoint (ex : `https://contoso.sharepoint.com/sites/chantiers`) |
-| `projectName` | Nom du projet/chantier (utilisé comme nom de dossier) |
-| `photosJson` | La sortie `PhotoPayloadJSON` du PCF, telle quelle |
+| `projectFolderPath` | colonne `ProjectFolderPath` du chantier, ex. `/Copie RTE ENEDIS/Projet 2026/Urrugne/Arborescence RTE type 2.0` |
+| `photosJson` | sortie `PhotoPayloadJSON` du PCF, telle quelle |
 
-> La bibliothèque cible est `Documents`. Si votre bibliothèque a un autre nom, modifiez les
-> paramètres `table` (Créer dossier) et le préfixe de `folderPath` (Créer fichier) dans le designer.
+Réponse : `{ result: "ok" | "error", count }`.
 
 ## Formules Power Apps
 
-Ajouter le flux à l'app (volet Power Automate), puis sur le contrôle PCF, propriété **OnChange** :
+Sur le contrôle PCF MenuChantier, propriété **OnChange** (remplacer `<chantier>` par l'enregistrement
+de la liste déjà utilisé pour alimenter `ProjectJSON`) :
 
 ```
 If(
-    Self.PhotoTrigger && !IsBlank(Self.PhotoPayloadJSON) && Self.PhotoPayloadJSON <> varLastPhotoPayload,
-    Set(varLastPhotoPayload, Self.PhotoPayloadJSON);
-    EnvoiPhotosChantier.Run(
-        varSharepointUrl,          // ou la colonne SharepointUrl liée au contrôle
-        varProject.Title,          // nom du projet affiché dans le PCF
-        Self.PhotoPayloadJSON
-    );
-    Notify("Photos envoyées", NotificationType.Success)
+    !IsBlank(Self.PhotoSendTimestamp) && Self.PhotoSendTimestamp <> varLastPhotoSend,
+    Set(varLastPhotoSend, Self.PhotoSendTimestamp);
+    Set(varPhotoResult, EnvoiPhotosChantier.Run(<chantier>.ProjectFolderPath, Self.PhotoPayloadJSON));
+    If(
+        varPhotoResult.result = "ok",
+        Notify("Photos envoyées (" & varPhotoResult.count & ")", NotificationType.Success),
+        Notify("Échec de l'envoi des photos", NotificationType.Error)
+    )
 )
 ```
 
-Le garde `varLastPhotoPayload` est nécessaire : `PhotoTrigger` passe aussi à `true` à
-l'ouverture du panneau photo, avant toute capture. Initialiser la variable dans **App.OnStart** :
+Dans **App.OnStart** : `Set(varLastPhotoSend, "")`.
 
-```
-Set(varLastPhotoPayload, "")
-```
+`PhotoSendTimestamp` change à chaque clic sur **Valider**, et seulement là. Ne plus se baser sur
+`PhotoTrigger`, qui passe aussi à `true` à l'ouverture du panneau photo.
+
+## Nommage des dossiers
+
+Le PCF calcule `liaisonFolder` / `elementFolder` avec **la même règle** que `VerifierDossiersSchema`
+(`MenuChantier/photoFolders.ts`) :
+
+- Liaison : `comment`, sinon `Liaison N`.
+- Élément : `label`, sinon `Extrémité N` (`type = termination`) / `Jonction N`. N = position dans le
+  tableau brut `elements`, avant le tri des schémas v1. Le PCF affiche `E1`/`J2`, mais le dossier
+  reste `Extrémité 1`/`Jonction 2`.
+- Le flux assainit ensuite chaque segment avec la même chaîne `replace` (`" * : < > ? / \ |` → `_`).
 
 ## Format du payload
 
-`PhotoPayloadJSON` est un tableau JSON :
+`PhotoPayloadJSON` est un tableau JSON. Les photos sont réduites dans le PCF (2048 px max,
+JPEG 0.85). Si une image n'est pas décodable (HEIC), l'original est envoyé avec son extension.
 
 ```json
 [{
   "base64": "<jpeg base64 sans préfixe data URI>",
-  "fileName": "Liaison_LSB_Transfo_LSB_1752345678_123",
+  "fileName": "LS1_Pyl_ne_LS1_DP_2026-09-25_14h32m05.jpg",
   "photoType": "schema",
-  "zoneLabel": "Liaison LSB - Transfo LSB",
-  "liaison": "Liaison LSB"
+  "zoneLabel": "LS1 - Pylône LS1",
+  "liaison": "LS1",
+  "liaisonFolder": "LS1",
+  "elementFolder": "Pylône LS1"
 }]
 ```
 
-Le flux ajoute l'extension `.jpg` au `fileName`.
+`fileName` = `<liaison>_<repère>_<initiales>_<AAAA-MM-JJ>_<HHhMMmSS>.<ext>` (`MenuChantier/photoNaming.ts`) :
+
+- Initiales : `CurrentUserName` (lier à `User().FullName`) — segment omis si vide.
+- Date/heure : prise de vue de la photo, heure locale. Caméra : instant du déclenchement ;
+  galerie : EXIF `DateTimeOriginal`, sinon date du fichier.
+- Deux photos du même lot à la même seconde : suffixe `_2`, `_3`… (le flux écrit le nom tel quel).
 
 ## Échantillons de schéma (dossier `samples/`)
 
